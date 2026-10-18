@@ -32,6 +32,8 @@ flowchart LR
 3. ArgoCD keeps the cluster in sync with Git (`automated`, `prune`, `selfHeal`). Manual changes in the cluster are reverted.
 4. Adding a new service = adding a YAML in `apps/`, commit and push.
 
+> **Detailed design:** [docs/architecture.md](docs/architecture.md)
+
 ## Stack
  
 | Component | Purpose |
