@@ -1,0 +1,13 @@
+extends: default
+
+rules:
+  # Kubernetes manifests rarely start with "---" and line length hurts readability of URLs and values.
+  document-start: disable
+  line-length: disable
+  # Allow inline maps like `{ containerPort: 80, hostPort: 80 }`.
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  # GitHub Actions uses `on:` as a key, which yamllint would flag as a truthy value.
+  truthy:
+    check-keys: false

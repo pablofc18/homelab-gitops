@@ -31,7 +31,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
-Current state: `apps/traefik.yaml` is the only populated app. `apps/cert-manager.yaml`, `apps/monitoring.yaml`, `apps/vaultwarden.yaml` and the matching `manifests/monitoring/`, `manifests/vaultwarden/` dirs are **empty placeholders** for roadmap items. Fill them in deliberately; don't assume they work.
+Current state: `apps/traefik.yaml` is the only app. `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
 
 ## Conventions
 
@@ -81,10 +81,10 @@ Read-only inspection is always fine (`kubectl get/describe/logs`, `argocd app ge
 
 ## Validating changes (before pushing)
 
-There is no CI yet, so validate locally where possible:
+CI (`.github/workflows/lint.yaml`) runs `yamllint --strict` on every PR and push to `main`, using the rules in `.yamllint`. Run the same checks locally before pushing:
 
 ```bash
-yamllint apps bootstrap manifests
+uvx yamllint@1.37.1 --strict .
 helm template <release> <chart> --version <pinned> -f <values>   # render a chart's output
 kubeconform -strict <rendered-or-raw-manifests>                  # if installed
 ```
