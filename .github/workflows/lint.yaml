@@ -1,0 +1,21 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  yamllint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install yamllint
+        run: pip install yamllint==1.37.1
+
+      - name: Run yamllint
+        run: yamllint --strict --format github .
