@@ -81,13 +81,19 @@ Read-only inspection is always fine (`kubectl get/describe/logs`, `argocd app ge
 
 ## Validating changes (before pushing)
 
-CI (`.github/workflows/lint.yaml`) runs `yamllint --strict` on every PR and push to `main`, using the rules in `.yamllint`. Run the same checks locally before pushing:
+CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; both jobs are required checks on `main`:
+
+- `yamllint`: `yamllint --strict` with the rules in `.yamllint`.
+- `kubeconform`: `scripts/validate-manifests.sh` validates the Applications against the ArgoCD CRD schema, renders every Helm-based app with `helm template` (same chart, version and inline values ArgoCD uses) and validates the output with `kubeconform -strict`. CRD definitions are skipped (no upstream schema).
+
+Run the same checks locally before pushing (needs `helm`, `yq` v4, `kubeconform`):
 
 ```bash
-uvx yamllint@1.37.1 --strict .
-helm template <release> <chart> --version <pinned> -f <values>   # render a chart's output
-kubeconform -strict <rendered-or-raw-manifests>                  # if installed
+make lint       # or: uvx yamllint@1.37.1 --strict .
+make validate
 ```
+
+If you add an app whose source type the script does not handle, extend the script so it stays covered.
 
 After pushing, confirm with `make status` / the ArgoCD UI that the app is `Synced` and `Healthy`.
 

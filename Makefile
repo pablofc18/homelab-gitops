@@ -1,7 +1,7 @@
 CLUSTER_NAME := homelab
 ARGOCD_VERSION := v3.5.5
 
-.PHONY: up destroy status argocd-ui argocd-password
+.PHONY: up destroy status argocd-ui argocd-password lint validate
 
 up:
 	kind create cluster --name $(CLUSTER_NAME) --config bootstrap/kind-config.yaml
@@ -23,3 +23,9 @@ argocd-ui:
 
 argocd-password:
 	argocd admin initial-password -n argocd
+
+lint:
+	yamllint --strict .
+
+validate:
+	./scripts/validate-manifests.sh
