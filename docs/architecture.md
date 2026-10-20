@@ -138,7 +138,7 @@ flowchart LR
 
 | Value | Why |
 |---|---|
-| `service.type: ClusterIP` | kind has no cloud load balancer, so `LoadBalancer` would stay pending |
+| `service.spec.type: ClusterIP` | kind has no cloud load balancer, so `LoadBalancer` would stay pending |
 | `ports.web.hostPort: 80`, `ports.websecure.hostPort: 443` | Bind the node ports mapped to the host |
 | `nodeSelector: ingress-ready=true` | Run only on the node that exposes the ports |
 | `tolerations` for `node-role.kubernetes.io/control-plane` | Control-plane nodes are tainted by default; this lets Traefik run there |

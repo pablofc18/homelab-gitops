@@ -12,7 +12,8 @@ spec:
     helm:
       values: |
         service:
-          type: ClusterIP
+          spec:
+            type: ClusterIP
         ports:
           web:
             hostPort: 80
