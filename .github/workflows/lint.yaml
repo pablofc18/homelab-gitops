@@ -22,24 +22,27 @@ jobs:
 
   kubeconform:
     runs-on: ubuntu-24.04
-    env:
-      HELM_VERSION: v4.2.2
-      YQ_VERSION: v4.54.1
-      KUBECONFORM_VERSION: v0.8.0
     steps:
       - uses: actions/checkout@v6
 
       - name: Install tools
-        run: |
-          mkdir -p "$HOME/bin"
-          curl -sSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
-            | tar xz -C "$HOME/bin" --strip-components=1 linux-amd64/helm
-          curl -sSL -o "$HOME/bin/yq" \
-            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
-          chmod +x "$HOME/bin/yq"
-          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
-            | tar xz -C "$HOME/bin" kubeconform
-          echo "$HOME/bin" >> "$GITHUB_PATH"
+        run: ./scripts/ci-install-tools.sh helm yq kubeconform
 
       - name: Render and validate manifests
         run: ./scripts/validate-manifests.sh
+
+  trivy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install tools
+        run: ./scripts/ci-install-tools.sh helm yq kubeconform trivy
+
+      - name: Render manifests
+        run: RENDER_DIR=.rendered ./scripts/validate-manifests.sh
+
+      - name: Scan rendered manifests for misconfigurations
+        run: >-
+          trivy config --skip-version-check --exit-code 1 --severity HIGH,CRITICAL
+          --ignorefile .trivyignore.yaml .rendered/manifests
