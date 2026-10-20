@@ -119,6 +119,8 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 | `make status` | Show nodes, ArgoCD applications and all pods |
 | `make argocd-ui` | Port-forward the ArgoCD UI to `localhost:8080` |
 | `make argocd-password` | Print the initial ArgoCD admin password |
+| `make lint` | Run `yamllint` on the repo |
+| `make validate` | Render all apps and validate them with `kubeconform` |
  
 ## Design decisions
  
@@ -140,7 +142,8 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] ArgoCD with app-of-apps bootstrap
 - [x] Traefik ingress controller
 - [x] Pin all chart versions
-- [ ] CI: `yamllint`, `kubeconform` and Trivy on pull requests
+- [x] CI: `yamllint` and `kubeconform` on pull requests
+- [ ] CI: Trivy config scanning
 - [ ] Renovate for automated dependency updates
 - [ ] cert-manager (TLS)
 - [ ] kube-prometheus-stack (Prometheus, Grafana, Alertmanager) exposed via ingress
