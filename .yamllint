@@ -1,5 +1,9 @@
 extends: default
 
+# Generated output (helm template), not authored in this repo.
+ignore: |
+  .rendered/
+
 rules:
   # Kubernetes manifests rarely start with "---" and line length hurts readability of URLs and values.
   document-start: disable

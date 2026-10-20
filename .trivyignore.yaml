@@ -1,0 +1,16 @@
+# Accepted Trivy misconfiguration findings. Every entry must be scoped to the
+# rendered manifest it applies to and explain why the risk is accepted.
+# Paths are relative to the scanned directory (rendered manifests, one file per app).
+misconfigurations:
+  - id: KSV-0024
+    paths:
+      - traefik.yaml
+    statement: >-
+      Traefik binds hostPort 80/443 on purpose: kind has no cloud load balancer and only the
+      control-plane node maps these ports to the host. See docs/architecture.md (Network path).
+  - id: KSV-0041
+    paths:
+      - traefik.yaml
+    statement: >-
+      The ingress controller must read TLS Secrets in every namespace that defines an Ingress.
+      Revisit if Traefik is restricted to a fixed set of namespaces.

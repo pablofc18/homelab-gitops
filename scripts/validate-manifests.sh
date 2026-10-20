@@ -20,8 +20,16 @@ kubeconform_args=(
   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
 )
 
-workdir="$(mktemp -d)"
-trap 'rm -rf "$workdir"' EXIT
+# Set RENDER_DIR to keep the rendered manifests (e.g. to scan them with Trivy).
+if [[ -n "${RENDER_DIR:-}" ]]; then
+  workdir="$RENDER_DIR"
+  rm -rf "$workdir"
+else
+  workdir="$(mktemp -d)"
+  trap 'rm -rf "$workdir"' EXIT
+fi
+# Rendered manifests and helper values files are kept apart so scanners only see manifests.
+mkdir -p "$workdir/manifests" "$workdir/values"
 
 failed=0
 
@@ -48,16 +56,16 @@ for app in apps/*.yaml; do
 
   if [[ -n "$chart" ]]; then
     version="$(yq '.spec.source.targetRevision' "$app")"
-    values="$workdir/$name-values.yaml"
+    values="$workdir/values/$name.yaml"
     # Inline values can be a string (helm.values) or an object (helm.valuesObject).
     yq '.spec.source.helm.values // ""' "$app" > "$values"
-    yq '.spec.source.helm.valuesObject // {}' "$app" > "$workdir/$name-values-object.yaml"
+    yq '.spec.source.helm.valuesObject // {}' "$app" > "$workdir/values/$name-object.yaml"
 
-    rendered="$workdir/$name.yaml"
+    rendered="$workdir/manifests/$name.yaml"
     helm template "$name" "$chart" \
       --repo "$repo" --version "$version" --namespace "$namespace" \
       --include-crds \
-      -f "$values" -f "$workdir/$name-values-object.yaml" > "$rendered"
+      -f "$values" -f "$workdir/values/$name-object.yaml" > "$rendered"
     validate "$name (chart $chart@$version)" "$rendered"
 
   elif [[ "${repo%.git}" == "$REPO_URL" && -n "$path" ]]; then

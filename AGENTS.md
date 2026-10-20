@@ -85,12 +85,16 @@ CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; both job
 
 - `yamllint`: `yamllint --strict` with the rules in `.yamllint`.
 - `kubeconform`: `scripts/validate-manifests.sh` validates the Applications against the ArgoCD CRD schema, renders every Helm-based app with `helm template` (same chart, version and inline values ArgoCD uses) and validates the output with `kubeconform -strict`. CRD definitions are skipped (no upstream schema).
+- `trivy`: scans the same rendered manifests with `trivy config` and fails on HIGH/CRITICAL findings. Accepted risks live in `.trivyignore.yaml`, each scoped to one app's rendered file and with a `statement` explaining why. Never add an ignore without that justification; prefer fixing the values.
 
-Run the same checks locally before pushing (needs `helm`, `yq` v4, `kubeconform`):
+Tool versions for CI are pinned in `scripts/ci-install-tools.sh` (Trivy is installed as a checksum-verified binary, not via a third-party action).
+
+Run the same checks locally before pushing (needs `helm`, `yq` v4, `kubeconform`, `trivy`):
 
 ```bash
 make lint       # or: uvx yamllint@1.37.1 --strict .
 make validate
+make scan
 ```
 
 If you add an app whose source type the script does not handle, extend the script so it stays covered.

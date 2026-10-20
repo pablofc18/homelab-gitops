@@ -1,7 +1,7 @@
 CLUSTER_NAME := homelab
 ARGOCD_VERSION := v3.5.5
 
-.PHONY: up destroy status argocd-ui argocd-password lint validate
+.PHONY: up destroy status argocd-ui argocd-password lint validate scan
 
 up:
 	kind create cluster --name $(CLUSTER_NAME) --config bootstrap/kind-config.yaml
@@ -29,3 +29,7 @@ lint:
 
 validate:
 	./scripts/validate-manifests.sh
+
+scan:
+	RENDER_DIR=.rendered ./scripts/validate-manifests.sh
+	trivy config --skip-version-check --exit-code 1 --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml .rendered/manifests
