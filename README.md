@@ -56,6 +56,7 @@ homelab-gitops/
 ├── manifests/               # Custom manifests / values referenced by apps
 ├── docs/                    # Extra documentation
 ├── Makefile
+├── renovate.json            # Automated dependency update PRs
 └── README.md
 ```
  
@@ -133,7 +134,6 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 
 ## Known limitations
  
-- Chart versions and the ArgoCD install manifest are not yet fully pinned, so builds are not 100% reproducible. Pinning and automated updates via Renovate are on the roadmap.
 - kind clusters are meant for development, not for staying up across reboots. After a reboot the node containers may need to be started again, or the cluster recreated with `make destroy && make up`.
 - No persistent data worth keeping yet. Stateful apps will need backups before they hold real data.
 
@@ -144,7 +144,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] Traefik ingress controller
 - [x] Pin all chart versions
 - [x] CI: `yamllint`, `kubeconform` and Trivy on pull requests
-- [ ] Renovate for automated dependency updates
+- [x] Renovate for automated dependency updates
 - [ ] cert-manager (TLS)
 - [ ] kube-prometheus-stack (Prometheus, Grafana, Alertmanager) exposed via ingress
 - [ ] Secrets management with SOPS + age

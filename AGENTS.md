@@ -54,7 +54,7 @@ Use `apps/traefik.yaml` as the reference template.
 
 ### Versions
 - **Pin everything**: Helm `targetRevision` must be an exact version, never `*`, `latest` or a range. Container images too (tag, ideally digest).
-- Known gap: the ArgoCD install manifest in the `Makefile` is pinned via `ARGOCD_VERSION`. Renovate is planned for automated bumps.
+- Renovate (`renovate.json`) opens PRs for version bumps: Helm charts in `apps/` (argocd manager), GitHub Actions (pinned to digests) and any variable annotated with a `# renovate: datasource=... depName=...` comment in the `Makefile` or `scripts/*.sh` (e.g. `ARGOCD_VERSION`, CI tool versions). When adding a new pinned version outside those managers, add the annotation so it stays covered.
 
 ### kind-specific choices (document them as such)
 - No cloud LoadBalancer: Traefik uses `service.spec.type: ClusterIP`, `hostPort` 80/443, `nodeSelector: ingress-ready=true` and a control-plane toleration.

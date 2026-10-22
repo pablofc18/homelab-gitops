@@ -1,4 +1,5 @@
 CLUSTER_NAME := homelab
+# renovate: datasource=github-releases depName=argoproj/argo-cd
 ARGOCD_VERSION := v3.5.5
 
 .PHONY: up destroy status argocd-ui argocd-password lint validate scan
