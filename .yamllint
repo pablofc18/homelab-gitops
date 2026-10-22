@@ -15,3 +15,6 @@ rules:
   # GitHub Actions uses `on:` as a key, which yamllint would flag as a truthy value.
   truthy:
     check-keys: false
+  # Renovate pins actions as `uses: owner/action@<sha> # v6`, with a single space before the comment.
+  comments:
+    min-spaces-from-content: 1
