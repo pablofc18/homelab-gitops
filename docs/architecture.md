@@ -185,7 +185,8 @@ Current state and planned improvements:
 - The ArgoCD initial admin password should be changed and the initial secret removed.
 - ArgoCD UI is only reachable through a local `port-forward`; it is not exposed.
 - No secrets are stored in the repo. Secrets management with SOPS + age is planned before any app needs credentials.
-- Planned: Trivy and `kubeconform` in CI, and pinned chart versions to improve supply-chain safety.
+- Supply chain: every chart, CLI tool and the ArgoCD manifest are pinned to exact versions, and GitHub Actions to commit digests. CI validates (`kubeconform`) and scans (Trivy) the rendered manifests on every PR.
+- Renovate proposes version bumps as pull requests, so every update goes through the same CI checks before it reaches `main`. New releases must be at least 3 days old (`minimumReleaseAge`), which leaves time for a compromised release to be detected and pulled before it is proposed.
 
 ## 13. Planned evolution
 
