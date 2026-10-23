@@ -14,3 +14,22 @@ misconfigurations:
     statement: >-
       The ingress controller must read TLS Secrets in every namespace that defines an Ingress.
       Revisit if Traefik is restricted to a fixed set of namespaces.
+  - id: KSV-0041
+    paths:
+      - cert-manager.yaml
+    statement: >-
+      cert-manager stores every issued certificate and its private key in a Secret, in the
+      namespace of the Certificate, so its controllers must manage Secrets cluster-wide.
+      The chart's RBAC is all-or-nothing (global.rbac.create), it cannot be scoped down.
+  - id: KSV-0056
+    paths:
+      - cert-manager.yaml
+    statement: >-
+      The ACME challenges controller creates temporary solver Pods, Services and Ingresses for
+      HTTP-01 validation. Not used yet (local CA issuer), but the ClusterRole is not optional.
+  - id: KSV-0114
+    paths:
+      - cert-manager.yaml
+    statement: >-
+      cainjector patches the caBundle of cert-manager's own webhook configurations. Disabling it
+      would break the cert-manager webhook, so the permission is required.

@@ -31,7 +31,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
-Current state: `apps/traefik.yaml` is the only app. `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
+Current state: `apps/traefik.yaml` and `apps/cert-manager.yaml` (controller and CRDs only, no issuers yet). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
 
 ## Conventions
 
@@ -81,7 +81,7 @@ Read-only inspection is always fine (`kubectl get/describe/logs`, `argocd app ge
 
 ## Validating changes (before pushing)
 
-CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; both jobs are required checks on `main`:
+CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; all three jobs are required checks on `main` (ruleset `protect_main`, branches must be up to date before merging):
 
 - `yamllint`: `yamllint --strict` with the rules in `.yamllint`.
 - `kubeconform`: `scripts/validate-manifests.sh` validates the Applications against the ArgoCD CRD schema, renders every Helm-based app with `helm template` (same chart, version and inline values ArgoCD uses) and validates the output with `kubeconform -strict`. CRD definitions are skipped (no upstream schema).
