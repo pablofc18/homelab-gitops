@@ -1,0 +1,7 @@
+# sops reads this file to know how to encrypt: `sops -e -i manifests/<app>/<name>.sops.yaml`.
+# Only the values under data/stringData are encrypted, so the rest of the resource stays
+# readable in Git and diffs. The age private key is never in this repo (see README).
+creation_rules:
+  - path_regex: manifests/.+\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1r2etq9cy42hwtkwungr8txlxgzm7n9qf4mgcttwgt94epe5h49hsx5zfhu
