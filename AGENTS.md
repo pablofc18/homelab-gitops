@@ -31,7 +31,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
-Current state: `apps/traefik.yaml` and `apps/cert-manager.yaml` (controller and CRDs only, no issuers yet). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
+Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
 
 ## Conventions
 
@@ -48,6 +48,7 @@ Current state: `apps/traefik.yaml` and `apps/cert-manager.yaml` (controller and 
      syncOptions:
        - CreateNamespace=true
    ```
+   Exception: an app that uses CRDs installed by another app also adds `SkipDryRunOnMissingResource=true` and a `retry` policy (see `apps/cert-manager-issuers.yaml`), because `root` syncs all apps at once.
 5. Update the README roadmap / `docs/architecture.md` when the change is architecturally meaningful.
 
 Use `apps/traefik.yaml` as the reference template.
@@ -84,7 +85,7 @@ Read-only inspection is always fine (`kubectl get/describe/logs`, `argocd app ge
 CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; all three jobs are required checks on `main` (ruleset `protect_main`, branches must be up to date before merging):
 
 - `yamllint`: `yamllint --strict` with the rules in `.yamllint`.
-- `kubeconform`: `scripts/validate-manifests.sh` validates the Applications against the ArgoCD CRD schema, renders every Helm-based app with `helm template` (same chart, version and inline values ArgoCD uses) and validates the output with `kubeconform -strict`. CRD definitions are skipped (no upstream schema).
+- `kubeconform`: `scripts/validate-manifests.sh` validates the Applications against the ArgoCD CRD schema, renders every Helm-based app with `helm template` (same chart, version and inline values ArgoCD uses), bundles every `path` app from `manifests/` into one file, and validates the output with `kubeconform -strict`. Custom resources are validated with schemas from the datreeio CRDs-catalog. CRD definitions are skipped (no upstream schema).
 - `trivy`: scans the same rendered manifests with `trivy config` and fails on HIGH/CRITICAL findings. Accepted risks live in `.trivyignore.yaml`, each scoped to one app's rendered file and with a `statement` explaining why. Never add an ignore without that justification; prefer fixing the values.
 
 Tool versions for CI are pinned in `scripts/ci-install-tools.sh` (Trivy is installed as a checksum-verified binary, not via a third-party action).
