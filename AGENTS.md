@@ -31,7 +31,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
-Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`) and `apps/whoami.yaml` (smoke test for ingress + TLS at `https://whoami.localhost`; use `manifests/whoami/` as the reference for plain manifests: pinned image digest, restricted securityContext, resources, `cert-manager.io/cluster-issuer` annotation on the Ingress). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
+Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`) and `apps/whoami.yaml` (smoke test for ingress + TLS at `https://whoami.localhost`; use `manifests/whoami/` as the reference for plain manifests: pinned image digest, restricted securityContext, resources, `cert-manager.io/cluster-issuer` annotation on the Ingress) and `apps/kube-prometheus-stack.yaml` (Prometheus, Alertmanager, node-exporter, kube-state-metrics in namespace `monitoring`; Grafana not enabled yet; kind-unreachable control-plane targets disabled). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
 
 ## Conventions
 

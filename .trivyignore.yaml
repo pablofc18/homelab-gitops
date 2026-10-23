@@ -33,3 +33,33 @@ misconfigurations:
     statement: >-
       cainjector patches the caBundle of cert-manager's own webhook configurations. Disabling it
       would break the cert-manager webhook, so the permission is required.
+  - id: KSV-0009
+    paths:
+      - kube-prometheus-stack.yaml
+    statement: >-
+      node-exporter measures the node, not its own container: it needs the host network
+      namespace to report the node's network interfaces and traffic.
+  - id: KSV-0010
+    paths:
+      - kube-prometheus-stack.yaml
+    statement: >-
+      node-exporter needs the host PID namespace to report node-level process metrics.
+  - id: KSV-0121
+    paths:
+      - kube-prometheus-stack.yaml
+    statement: >-
+      node-exporter mounts the host's /, /proc and /sys read-only to read filesystem, CPU,
+      memory and hardware metrics of the node.
+  - id: KSV-0041
+    paths:
+      - kube-prometheus-stack.yaml
+    statement: >-
+      prometheus-operator generates the Prometheus and Alertmanager configuration as Secrets.
+      kube-state-metrics no longer reads Secrets (its "secrets" collector is disabled), so this
+      only covers the operator. The ignore is file-wide: re-check if another component adds it.
+  - id: KSV-0056
+    paths:
+      - kube-prometheus-stack.yaml
+    statement: >-
+      prometheus-operator creates the governing Services (prometheus-operated,
+      alertmanager-operated) and maintains the kubelet Service and Endpoints it scrapes.
