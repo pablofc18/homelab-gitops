@@ -52,6 +52,7 @@ homelab-gitops/
 │   ├── kind-config.yaml     # Cluster definition (nodes, port mappings, labels)
 │   └── root-app.yaml        # ArgoCD root Application (app-of-apps)
 ├── apps/                    # One ArgoCD Application per service (watched by root)
+│   ├── cert-manager.yaml
 │   └── traefik.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
 ├── docs/                    # Extra documentation
