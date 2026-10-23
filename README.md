@@ -54,7 +54,8 @@ homelab-gitops/
 ├── apps/                    # One ArgoCD Application per service (watched by root)
 │   ├── cert-manager.yaml
 │   ├── cert-manager-issuers.yaml
-│   └── traefik.yaml
+│   ├── traefik.yaml
+│   └── whoami.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
 ├── docs/                    # Extra documentation
 ├── Makefile
@@ -90,10 +91,17 @@ make up
 make status
 ```
  
-Verify the ingress is listening (a `404` from Traefik is the expected response while no routes exist):
+Verify the ingress is listening (a `404` from Traefik is the expected response for unknown hosts):
  
 ```bash
 curl -i http://localhost
+```
+ 
+Verify TLS end to end with the `whoami` test app. Its certificate is signed by the lab's own CA, so pass that CA to `curl`:
+ 
+```bash
+kubectl get secret homelab-ca -n cert-manager -o jsonpath='{.data.ca\.crt}' | base64 -d > homelab-ca.crt
+curl --cacert homelab-ca.crt https://whoami.localhost
 ```
  
 ### Access the ArgoCD UI
@@ -147,7 +155,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] Pin all chart versions
 - [x] CI: `yamllint`, `kubeconform` and Trivy on pull requests
 - [x] Renovate for automated dependency updates
-- [ ] cert-manager (TLS)
+- [x] cert-manager (TLS) with a local CA
 - [ ] kube-prometheus-stack (Prometheus, Grafana, Alertmanager) exposed via ingress
 - [ ] Secrets management with SOPS + age
 - [ ] First real applications (e.g. Vaultwarden, Gitea)

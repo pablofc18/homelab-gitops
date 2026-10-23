@@ -31,7 +31,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
-Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
+Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`) and `apps/whoami.yaml` (smoke test for ingress + TLS at `https://whoami.localhost`; use `manifests/whoami/` as the reference for plain manifests: pinned image digest, restricted securityContext, resources, `cert-manager.io/cluster-issuer` annotation on the Ingress). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
 
 ## Conventions
 
@@ -55,7 +55,7 @@ Use `apps/traefik.yaml` as the reference template.
 
 ### Versions
 - **Pin everything**: Helm `targetRevision` must be an exact version, never `*`, `latest` or a range. Container images too (tag, ideally digest).
-- Renovate (`renovate.json`) opens PRs for version bumps: Helm charts in `apps/` (argocd manager), GitHub Actions (pinned to digests) and any variable annotated with a `# renovate: datasource=... depName=...` comment in the `Makefile` or `scripts/*.sh` (e.g. `ARGOCD_VERSION`, CI tool versions). When adding a new pinned version outside those managers, add the annotation so it stays covered.
+- Renovate (`renovate.json`) opens PRs for version bumps: Helm charts in `apps/` (argocd manager), container images in `manifests/` (kubernetes manager, tag + digest), GitHub Actions (pinned to digests) and any variable annotated with a `# renovate: datasource=... depName=...` comment in the `Makefile` or `scripts/*.sh` (e.g. `ARGOCD_VERSION`, CI tool versions). When adding a new pinned version outside those managers, add the annotation so it stays covered.
 
 ### kind-specific choices (document them as such)
 - No cloud LoadBalancer: Traefik uses `service.spec.type: ClusterIP`, `hostPort` 80/443, `nodeSelector: ingress-ready=true` and a control-plane toleration.
@@ -75,7 +75,8 @@ make status             # nodes, ArgoCD applications, all pods
 make argocd-password    # initial admin password
 make argocd-ui          # port-forward UI to https://localhost:8080
 make destroy            # delete the cluster
-curl -i http://localhost  # expect 404 from Traefik while no routes exist
+curl -i http://localhost  # expect 404 from Traefik for unknown hosts
+curl --cacert homelab-ca.crt https://whoami.localhost  # TLS end to end (CA from Secret homelab-ca in cert-manager)
 ```
 
 Read-only inspection is always fine (`kubectl get/describe/logs`, `argocd app get`, `helm template`, `helm show values`). Before running anything that mutates the cluster or the host (`make up`, `make destroy`, `docker`/`kind` operations), say what it will do. `make destroy` is cheap but loses all in-cluster state.
