@@ -11,6 +11,13 @@ spec:
   secretName: homelab-ca
   # Long-lived on purpose: renewing the CA means re-trusting it on the host.
   duration: 87600h # 10 years
+  # The CA is trusted on the host, so limit it to *.localhost: certificates it signs for
+  # any other domain are rejected by browsers and curl, even if its key leaks.
+  nameConstraints:
+    critical: true
+    permitted:
+      dnsDomains:
+        - localhost
   privateKey:
     algorithm: ECDSA
     size: 256

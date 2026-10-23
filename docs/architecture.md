@@ -166,7 +166,7 @@ flowchart LR
 | Traefik | ingress-nginx | ingress-nginx was retired by the Kubernetes project in March 2026 and is no longer maintained. |
 | Public repo | Private repo with credentials | No credential setup needed for ArgoCD, and the repo doubles as a portfolio. Secrets must never be committed in plain text. |
 | Helm for third-party apps | Raw manifests | Charts handle complexity; values stay in Git. |
-| Local CA (`homelab-ca` ClusterIssuer) | ACME / Let's Encrypt | kind-specific: no public domain, so ACME cannot validate ownership. cert-manager runs its own CA, bootstrapped by a self-signed issuer. With a real domain this becomes an ACME issuer with DNS-01; Certificates and Ingresses stay the same. |
+| Local CA (`homelab-ca` ClusterIssuer) | ACME / Let's Encrypt | kind-specific: no public domain, so ACME cannot validate ownership. cert-manager runs its own CA, bootstrapped by a self-signed issuer. The CA has an X.509 name constraint (`*.localhost` only), so trusting it on the host cannot be abused to impersonate other domains. With a real domain this becomes an ACME issuer with DNS-01; Certificates and Ingresses stay the same. |
 | Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`, which is not managed from Git yet. Retrying is simpler and self-healing. |
 
 ## 11. Failure modes and recovery
