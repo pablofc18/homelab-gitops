@@ -25,6 +25,15 @@ spec:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
             effect: NoSchedule
+        # Traefik copies its Service's load balancer address into every Ingress status, but a
+        # ClusterIP Service has none, so ArgoCD keeps Ingresses "Progressing". Publish the address
+        # traffic really enters through instead (kind: hostPort on localhost).
+        providers:
+          kubernetesIngress:
+            publishedService:
+              enabled: false
+            ingressEndpoint:
+              ip: 127.0.0.1
   destination:
     server: https://kubernetes.default.svc
     namespace: traefik
