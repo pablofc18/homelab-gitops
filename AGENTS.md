@@ -18,7 +18,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 - Anything running in the cluster must be declared in this repo. **Never** fix things with `kubectl apply/edit/patch` against ArgoCD-managed resources: `selfHeal` will revert it, and it breaks the GitOps lesson.
 - Deploying = commit + push to `main`. ArgoCD pulls and syncs (polls roughly every 3 min).
 - The cluster is disposable: `make destroy && make up` must always rebuild everything from Git.
-- Never commit secrets in plain text (the repo is public). Secrets management with SOPS + age is planned; until then, don't introduce apps that need credentials in Git.
+- Never commit secrets in plain text (the repo is public). Secrets go in Git as `SopsSecret` resources in `manifests/<app>/*.sops.yaml`, encrypted with `sops -e -i` (rules in `.sops.yaml`, only `data`/`stringData` values are encrypted) and decrypted in-cluster by sops-secrets-operator. Always check a `*.sops.yaml` file is encrypted (has a `sops:` block and `ENC[...]` values) before committing. The age private key (`~/.config/sops/age/keys.txt`) is loaded by `make up` / `make sops-key` and is never committed.
 
 ## Repository layout
 
@@ -31,7 +31,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
-Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`) and `apps/whoami.yaml` (smoke test for ingress + TLS at `https://whoami.localhost`; use `manifests/whoami/` as the reference for plain manifests: pinned image digest, restricted securityContext, resources, `cert-manager.io/cluster-issuer` annotation on the Ingress) and `apps/kube-prometheus-stack.yaml` (Prometheus, Alertmanager, node-exporter, kube-state-metrics in namespace `monitoring`; Grafana not enabled yet; kind-unreachable control-plane targets disabled). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
+Current state: `apps/traefik.yaml`, `apps/cert-manager.yaml` (controller and CRDs) and `apps/cert-manager-issuers.yaml` (local CA: `selfsigned` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer, manifests in `manifests/cert-manager-issuers/`) and `apps/whoami.yaml` (smoke test for ingress + TLS at `https://whoami.localhost`; use `manifests/whoami/` as the reference for plain manifests: pinned image digest, restricted securityContext, resources, `cert-manager.io/cluster-issuer` annotation on the Ingress) and `apps/kube-prometheus-stack.yaml` (Prometheus, Alertmanager, node-exporter, kube-state-metrics in namespace `monitoring`; Grafana not enabled yet; kind-unreachable control-plane targets disabled) and `apps/sops-secrets-operator.yaml` (decrypts `SopsSecret`s with the age key from Secret `sops-age-key`). `apps/` must only contain apps that are really deployed: add a file when the app is implemented, not as a placeholder.
 
 ## Conventions
 
@@ -73,6 +73,7 @@ Use `apps/traefik.yaml` as the reference template.
 make up                 # create kind cluster, install ArgoCD, apply root app
 make status             # nodes, ArgoCD applications, all pods
 make argocd-password    # initial admin password
+make sops-key           # load the local age private key into the cluster (also run by make up)
 make argocd-ui          # port-forward UI to https://localhost:8080
 make destroy            # delete the cluster
 curl -i http://localhost  # expect 404 from Traefik for unknown hosts
@@ -105,7 +106,7 @@ After pushing, confirm with `make status` / the ArgoCD UI that the app is `Synce
 
 ## Roadmap (what's next)
 
-CI (`yamllint`, `kubeconform`, Trivy) → Renovate → cert-manager (TLS) → kube-prometheus-stack (Prometheus/Grafana/Alertmanager) → SOPS + age secrets → first real apps (Vaultwarden, Gitea) → dashboards/alerts/SLOs → phase 2: multi-VM k3s with Terraform (libvirt) + Ansible, reusing this GitOps repo.
+CI (`yamllint`, `kubeconform`, Trivy) → Renovate → cert-manager (TLS) → kube-prometheus-stack (Prometheus/Alertmanager) → SOPS + age secrets → Grafana (ingress + credentials from SOPS) → first real apps (Vaultwarden, Gitea) → dashboards/alerts/SLOs → phase 2: multi-VM k3s with Terraform (libvirt) + Ansible, reusing this GitOps repo.
 
 When asked "what should I do next", follow this order and explain the reasoning for the next step.
 

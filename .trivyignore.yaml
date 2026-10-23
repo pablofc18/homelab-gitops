@@ -63,3 +63,17 @@ misconfigurations:
     statement: >-
       prometheus-operator creates the governing Services (prometheus-operated,
       alertmanager-operated) and maintains the kubelet Service and Endpoints it scrapes.
+  - id: KSV-0041
+    paths:
+      - sops-secrets-operator.yaml
+    statement: >-
+      The operator decrypts each SopsSecret and writes the resulting Secret in the
+      SopsSecret's namespace (e.g. monitoring for Grafana), so it must manage Secrets
+      cluster-wide.
+  - id: KSV-0045
+    paths:
+      - sops-secrets-operator.yaml
+    statement: >-
+      The chart's ClusterRole uses the "*" verb on secrets, configmaps, events and leases and
+      only offers rbac.enabled (all or nothing). Replacing it with a hand-written ClusterRole
+      would mean maintaining a copy of upstream RBAC; accepted for a single-user lab.

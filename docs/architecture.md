@@ -173,6 +173,7 @@ flowchart LR
 | Local CA (`homelab-ca` ClusterIssuer) | ACME / Let's Encrypt | kind-specific: no public domain, so ACME cannot validate ownership. cert-manager runs its own CA, bootstrapped by a self-signed issuer. The CA has an X.509 name constraint (`*.localhost` only), so trusting it on the host cannot be abused to impersonate other domains. With a real domain this becomes an ACME issuer with DNS-01; Certificates and Ingresses stay the same. |
 | No scraping of kube-controller-manager, kube-scheduler, etcd and kube-proxy | Patch kind's kubeadm config to bind their metrics on `0.0.0.0` | kind-specific: they only listen on the node's `127.0.0.1`, so their targets are always down and their alerts always fire. Exposing them needs a `kind-config.yaml` change and a cluster rebuild; revisit in phase 2 (k3s). |
 | cert-manager for the prometheus-operator webhook certificate | Chart's Helm hook Jobs (`kube-webhook-certgen`) | Hook Jobs are re-run by ArgoCD on every sync. cert-manager is already in the cluster and keeps the certificate renewed. |
+| sops-secrets-operator (decrypt in the cluster) | KSOPS / helm-secrets plugins in ArgoCD's repo-server | Follows ArgoCD's recommendation of destination-cluster secret management: ArgoCD only sees encrypted resources. Needs no changes to the ArgoCD installation, which the Makefile applies from the upstream manifest. |
 | Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`, which is not managed from Git yet. Retrying is simpler and self-healing. |
 
 ## 11. Failure modes and recovery
@@ -193,7 +194,8 @@ Current state and planned improvements:
 
 - The ArgoCD initial admin password should be changed and the initial secret removed.
 - ArgoCD UI is only reachable through a local `port-forward`; it is not exposed.
-- No secrets are stored in the repo. Secrets management with SOPS + age is planned before any app needs credentials.
+- Secrets are stored in the repo only encrypted with SOPS + age, as `SopsSecret` resources. sops-secrets-operator decrypts them in the cluster, so plain-text values never pass through ArgoCD (repo-server, cache or Redis).
+- The age private key is the "secret zero": it cannot be in Git because it protects everything else. It stays on the host and `make up` loads it into the Secret `sops-age-key`. Anyone who can read that Secret can decrypt every secret in the repo.
 - Supply chain: every chart, CLI tool and the ArgoCD manifest are pinned to exact versions, and GitHub Actions to commit digests. CI validates (`kubeconform`) and scans (Trivy) the rendered manifests on every PR.
 - Renovate proposes version bumps as pull requests, so every update goes through the same CI checks before it reaches `main`. New releases must be at least 3 days old (`minimumReleaseAge`), which leaves time for a compromised release to be detected and pulled before it is proposed.
 
