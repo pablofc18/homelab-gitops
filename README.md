@@ -54,6 +54,7 @@ homelab-gitops/
 ├── apps/                    # One ArgoCD Application per service (watched by root)
 │   ├── cert-manager.yaml
 │   ├── cert-manager-issuers.yaml
+│   ├── kube-prometheus-stack.yaml
 │   ├── traefik.yaml
 │   └── whoami.yaml
 ├── manifests/               # Custom manifests / values referenced by apps

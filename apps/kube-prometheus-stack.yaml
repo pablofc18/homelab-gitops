@@ -1,0 +1,83 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: "92.11.0"
+    helm:
+      values: |
+        # Grafana comes in a later step, together with its Ingress and admin credentials.
+        grafana:
+          enabled: false
+        # kind-specific: these control-plane components only expose metrics on the node's
+        # 127.0.0.1, so Prometheus cannot reach them and their "down" alerts would always fire.
+        kubeControllerManager:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeEtcd:
+          enabled: false
+        kubeProxy:
+          enabled: false
+        # Default collectors minus "secrets": listing Secrets returns their data, and the
+        # kube_secret_* metadata metrics are not worth cluster-wide read access to every Secret.
+        # Helm replaces lists instead of merging them, so the whole list is repeated here.
+        kube-state-metrics:
+          collectors:
+            - certificatesigningrequests
+            - configmaps
+            - cronjobs
+            - daemonsets
+            - deployments
+            - endpointslices
+            - horizontalpodautoscalers
+            - ingresses
+            - jobs
+            - leases
+            - limitranges
+            - mutatingwebhookconfigurations
+            - namespaces
+            - networkpolicies
+            - nodes
+            - persistentvolumeclaims
+            - persistentvolumes
+            - poddisruptionbudgets
+            - pods
+            - replicasets
+            - replicationcontrollers
+            - resourcequotas
+            - services
+            - statefulsets
+            - storageclasses
+            - validatingwebhookconfigurations
+            - volumeattachments
+        prometheusOperator:
+          admissionWebhooks:
+            # Issue the webhook certificate with cert-manager instead of Helm hook Jobs,
+            # which ArgoCD would re-run on every sync.
+            certManager:
+              enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The CRDs are too big for the last-applied-configuration annotation of client-side apply.
+      - ServerSideApply=true
+      # Uses cert-manager CRDs (Certificate, Issuer) from another app, see cert-manager-issuers.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

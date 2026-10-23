@@ -171,6 +171,8 @@ flowchart LR
 | Public repo | Private repo with credentials | No credential setup needed for ArgoCD, and the repo doubles as a portfolio. Secrets must never be committed in plain text. |
 | Helm for third-party apps | Raw manifests | Charts handle complexity; values stay in Git. |
 | Local CA (`homelab-ca` ClusterIssuer) | ACME / Let's Encrypt | kind-specific: no public domain, so ACME cannot validate ownership. cert-manager runs its own CA, bootstrapped by a self-signed issuer. The CA has an X.509 name constraint (`*.localhost` only), so trusting it on the host cannot be abused to impersonate other domains. With a real domain this becomes an ACME issuer with DNS-01; Certificates and Ingresses stay the same. |
+| No scraping of kube-controller-manager, kube-scheduler, etcd and kube-proxy | Patch kind's kubeadm config to bind their metrics on `0.0.0.0` | kind-specific: they only listen on the node's `127.0.0.1`, so their targets are always down and their alerts always fire. Exposing them needs a `kind-config.yaml` change and a cluster rebuild; revisit in phase 2 (k3s). |
+| cert-manager for the prometheus-operator webhook certificate | Chart's Helm hook Jobs (`kube-webhook-certgen`) | Hook Jobs are re-run by ArgoCD on every sync. cert-manager is already in the cluster and keeps the certificate renewed. |
 | Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`, which is not managed from Git yet. Retrying is simpler and self-healing. |
 
 ## 11. Failure modes and recovery
