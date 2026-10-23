@@ -1,0 +1,9 @@
+# Issuer that apps use: signs certificates with the homelab CA.
+# kind-specific: there is no public domain, so ACME (Let's Encrypt) cannot validate us.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: homelab-ca
+spec:
+  ca:
+    secretName: homelab-ca

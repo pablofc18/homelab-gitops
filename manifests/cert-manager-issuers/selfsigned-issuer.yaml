@@ -1,0 +1,7 @@
+# Bootstrap issuer: only used to sign the homelab CA certificate (homelab-ca-certificate.yaml).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}

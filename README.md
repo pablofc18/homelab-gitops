@@ -53,6 +53,7 @@ homelab-gitops/
 │   └── root-app.yaml        # ArgoCD root Application (app-of-apps)
 ├── apps/                    # One ArgoCD Application per service (watched by root)
 │   ├── cert-manager.yaml
+│   ├── cert-manager-issuers.yaml
 │   └── traefik.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
 ├── docs/                    # Extra documentation

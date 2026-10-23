@@ -92,6 +92,7 @@ flowchart TD
 - Each file in `apps/` is itself an ArgoCD `Application`.
 - Each of those apps points to its own source: a Helm chart repository, or a path inside this repo (`manifests/`).
 - Adding a service means adding one file to `apps/`. Removing one means deleting the file (`prune` cleans the cluster).
+- `root` syncs all apps at the same time, there is no ordering between them. An app that uses another app's CRDs (e.g. `cert-manager-issuers` needs cert-manager's `ClusterIssuer` CRD and webhook) adds `SkipDryRunOnMissingResource=true` and a `retry` policy, so on a fresh cluster it keeps retrying until its dependency is ready.
 
 ## 6. Reconciliation loop
 
@@ -165,6 +166,8 @@ flowchart LR
 | Traefik | ingress-nginx | ingress-nginx was retired by the Kubernetes project in March 2026 and is no longer maintained. |
 | Public repo | Private repo with credentials | No credential setup needed for ArgoCD, and the repo doubles as a portfolio. Secrets must never be committed in plain text. |
 | Helm for third-party apps | Raw manifests | Charts handle complexity; values stay in Git. |
+| Local CA (`homelab-ca` ClusterIssuer) | ACME / Let's Encrypt | kind-specific: no public domain, so ACME cannot validate ownership. cert-manager runs its own CA, bootstrapped by a self-signed issuer. With a real domain this becomes an ACME issuer with DNS-01; Certificates and Ingresses stay the same. |
+| Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`, which is not managed from Git yet. Retrying is simpler and self-healing. |
 
 ## 11. Failure modes and recovery
 

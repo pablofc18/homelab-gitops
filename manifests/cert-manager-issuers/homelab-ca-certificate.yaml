@@ -1,0 +1,20 @@
+# Root CA of the lab, stored in the Secret "homelab-ca". It lives in the cert-manager
+# namespace because ClusterIssuers read their Secrets from there.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: homelab-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: homelab-ca
+  secretName: homelab-ca
+  # Long-lived on purpose: renewing the CA means re-trusting it on the host.
+  duration: 87600h # 10 years
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: selfsigned

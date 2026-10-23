@@ -69,7 +69,11 @@ for app in apps/*.yaml; do
     validate "$name (chart $chart@$version)" "$rendered"
 
   elif [[ "${repo%.git}" == "$REPO_URL" && -n "$path" ]]; then
-    validate "$name (path $path)" "$path"
+    # Bundle the plain manifests into one file per app, like the Helm branch,
+    # so scanners (Trivy) cover them too.
+    rendered="$workdir/manifests/$name.yaml"
+    yq '.' "$path"/*.yaml > "$rendered"
+    validate "$name (path $path)" "$rendered"
 
   else
     echo "::warning::$name: source not supported by this script, skipped"
