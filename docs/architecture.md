@@ -145,6 +145,7 @@ flowchart LR
 | `ports.web.hostPort: 80`, `ports.websecure.hostPort: 443` | Bind the node ports mapped to the host |
 | `nodeSelector: ingress-ready=true` | Run only on the node that exposes the ports |
 | `tolerations` for `node-role.kubernetes.io/control-plane` | Control-plane nodes are tainted by default; this lets Traefik run there |
+| `updateStrategy.rollingUpdate: maxUnavailable: 1, maxSurge: 0` | With `hostPort` on a single node, the default surge rollout deadlocks: the new pod stays `Pending` because the old one holds ports 80/443. Replacing the pod costs a few seconds of downtime per upgrade |
 | `providers.kubernetesIngress.ingressEndpoint.ip: 127.0.0.1` (and `publishedService.enabled: false`) | Traefik writes this address into every Ingress status. Copying it from the `ClusterIP` Service would leave it empty, and ArgoCD reports Ingresses without an address as `Progressing` forever |
 
 ## 9. Repository layout and ownership

@@ -21,6 +21,13 @@ spec:
             hostPort: 443
         nodeSelector:
           ingress-ready: "true"
+        # Only one node can bind hostPort 80/443, so the new pod cannot start while the old one
+        # holds the ports. Stop the old pod first (a few seconds of downtime per upgrade).
+        updateStrategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 1
+            maxSurge: 0
         tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
