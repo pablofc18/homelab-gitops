@@ -131,7 +131,9 @@ flowchart LR
     T -.->|no matching rule| X[404]
 ```
 
-- With no Ingress resources defined yet, Traefik answers `404`. That confirms the path from host to Traefik works.
+- For hosts without an Ingress rule, Traefik answers `404`. That confirms the path from host to Traefik works.
+- TLS terminates at Traefik. An Ingress with the `cert-manager.io/cluster-issuer: homelab-ca` annotation and a `spec.tls` section makes cert-manager create a `Certificate` (owned by the Ingress) and store it in the Secret named in `spec.tls`, which Traefik serves on port 443. `whoami.localhost` is the reference example.
+- Hostnames use `*.localhost`, which resolves to `127.0.0.1` without DNS (RFC 6761). kind-specific: a real setup would use a real domain and an ACME issuer.
 - Inside the cluster, Traefik's own Service is `ClusterIP`: external traffic does not enter through it, but through the `hostPort`.
 - In a cloud environment this would be replaced by a `LoadBalancer` Service in front of Traefik.
 

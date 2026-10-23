@@ -1,0 +1,27 @@
+# The annotation asks cert-manager (ingress-shim) to create a Certificate for the hosts in
+# spec.tls, signed by the homelab CA, and store it in the whoami-tls Secret Traefik serves.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: whoami
+  namespace: whoami
+  annotations:
+    cert-manager.io/cluster-issuer: homelab-ca
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - whoami.localhost
+      secretName: whoami-tls
+  rules:
+    # *.localhost resolves to 127.0.0.1 without any DNS setup (RFC 6761).
+    - host: whoami.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: whoami
+                port:
+                  name: http

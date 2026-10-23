@@ -1,0 +1,47 @@
+# Tiny HTTP server that echoes the request: smoke test for ingress + TLS.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: whoami
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: whoami
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: whoami
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: whoami
+          image: traefik/whoami:v1.12.0@sha256:c4717a8d1f0134a7444e24f881160e033991f23027c6c5a9a3f8fd22e70d1d44
+          # Non-root users cannot bind ports below 1024, so listen on 8080.
+          args: ["--port", "8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http

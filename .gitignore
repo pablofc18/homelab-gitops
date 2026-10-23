@@ -2,3 +2,6 @@
 
 # Personal study notes (local only, never pushed)
 notes/
+
+# Lab CA certificate exported for curl/browser testing (see README)
+homelab-ca.crt
