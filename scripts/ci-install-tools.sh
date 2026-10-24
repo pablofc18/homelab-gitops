@@ -11,7 +11,7 @@ YQ_VERSION=v4.54.1
 # renovate: datasource=github-releases depName=yannh/kubeconform
 KUBECONFORM_VERSION=v0.8.0
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.+)$
-TRIVY_VERSION=0.76.0
+TRIVY_VERSION=0.76.1
 
 bin="$HOME/bin"
 mkdir -p "$bin"
