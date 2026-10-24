@@ -120,7 +120,8 @@ Secrets live in Git encrypted with [SOPS](https://github.com/getsops/sops) and a
 
 - The age **private** key stays on the host (`~/.config/sops/age/keys.txt`) and is never committed. `make up` loads it into the cluster as the Secret `sops-age-key` (the only secret not managed from Git); `make sops-key` does the same on an existing cluster.
 - **Back up the private key** (e.g. in a password manager). Without it, nothing encrypted in this repo can be decrypted again.
-- Encrypt in place before committing: `sops -e -i manifests/<app>/<name>.sops.yaml`. Edit later with `sops manifests/<app>/<name>.sops.yaml`.
+- Encrypt in place before committing: `sops -e -i manifests/<app>/<name>.sops.yaml`. Edit later with `sops manifests/<app>/<name>.sops.yaml`. CI fails if any `*.sops.yaml` is not encrypted.
+- Example: `manifests/whoami/whoami-test-secret.sops.yaml` becomes the Secret `whoami-test` in the `whoami` namespace.
  
 ### Access the ArgoCD UI
  

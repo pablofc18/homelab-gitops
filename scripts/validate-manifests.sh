@@ -43,6 +43,15 @@ validate() {
   echo "::endgroup::"
 }
 
+# 0. Every *.sops.yaml must be encrypted: a file that lost its sops metadata (e.g. committed
+#    before running `sops -e -i`) would publish its secret values in this public repo.
+while IFS= read -r file; do
+  if [[ "$(yq '.sops.mac // ""' "$file")" != ENC\[* ]]; then
+    echo "::error file=$file::$file is not encrypted with sops (run: sops -e -i $file)"
+    failed=1
+  fi
+done < <(find manifests -name '*.sops.yaml' -type f)
+
 # 1. The Application objects themselves.
 validate "Applications" bootstrap/root-app.yaml apps/
 
