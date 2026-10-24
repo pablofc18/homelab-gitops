@@ -55,12 +55,14 @@ homelab-gitops/
 │   ├── cert-manager.yaml
 │   ├── cert-manager-issuers.yaml
 │   ├── kube-prometheus-stack.yaml
+│   ├── sops-secrets-operator.yaml
 │   ├── traefik.yaml
 │   └── whoami.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
 ├── docs/                    # Extra documentation
 ├── Makefile
 ├── renovate.json            # Automated dependency update PRs
+├── .sops.yaml               # Which files SOPS encrypts, and with which age public key
 └── README.md
 ```
  
@@ -73,7 +75,14 @@ homelab-gitops/
 On Arch Linux:
  
 ```bash
-sudo pacman -S kubectl helm k9s kind argocd
+sudo pacman -S kubectl helm k9s kind argocd sops age
+```
+
+- An age key for SOPS (see [Secrets](#secrets-sops--age)). On a fork, generate your own and put its public key in `.sops.yaml`:
+
+```bash
+mkdir -p ~/.config/sops/age
+age-keygen -o ~/.config/sops/age/keys.txt && chmod 600 ~/.config/sops/age/keys.txt
 ```
  
 ## Quick start
@@ -104,6 +113,14 @@ Verify TLS end to end with the `whoami` test app. Its certificate is signed by t
 kubectl get secret homelab-ca -n cert-manager -o jsonpath='{.data.ca\.crt}' | base64 -d > homelab-ca.crt
 curl --cacert homelab-ca.crt https://whoami.localhost
 ```
+
+### Secrets (SOPS + age)
+
+Secrets live in Git encrypted with [SOPS](https://github.com/getsops/sops) and an [age](https://github.com/FiloSottile/age) key, as `SopsSecret` resources in files named `*.sops.yaml` under `manifests/`. [sops-secrets-operator](https://github.com/isindir/sops-secrets-operator) decrypts them inside the cluster and creates the real `Secret`, so ArgoCD never sees plain-text values.
+
+- The age **private** key stays on the host (`~/.config/sops/age/keys.txt`) and is never committed. `make up` loads it into the cluster as the Secret `sops-age-key` (the only secret not managed from Git); `make sops-key` does the same on an existing cluster.
+- **Back up the private key** (e.g. in a password manager). Without it, nothing encrypted in this repo can be decrypted again.
+- Encrypt in place before committing: `sops -e -i manifests/<app>/<name>.sops.yaml`. Edit later with `sops manifests/<app>/<name>.sops.yaml`.
  
 ### Access the ArgoCD UI
  
@@ -131,6 +148,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 | `make status` | Show nodes, ArgoCD applications and all pods |
 | `make argocd-ui` | Port-forward the ArgoCD UI to `localhost:8080` |
 | `make argocd-password` | Print the initial ArgoCD admin password |
+| `make sops-key` | Load the local age private key into the cluster (also run by `make up`) |
 | `make lint` | Run `yamllint` on the repo |
 | `make validate` | Render all apps and validate them with `kubeconform` |
 | `make scan` | Render all apps and scan them with Trivy (fails on HIGH/CRITICAL) |
@@ -157,8 +175,9 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] CI: `yamllint`, `kubeconform` and Trivy on pull requests
 - [x] Renovate for automated dependency updates
 - [x] cert-manager (TLS) with a local CA
-- [ ] kube-prometheus-stack (Prometheus, Grafana, Alertmanager) exposed via ingress
-- [ ] Secrets management with SOPS + age
+- [x] kube-prometheus-stack: Prometheus, Alertmanager, node-exporter, kube-state-metrics
+- [ ] Secrets management with SOPS + age (in progress: operator deployed)
+- [ ] Grafana exposed via ingress, admin credentials from SOPS
 - [ ] First real applications (e.g. Vaultwarden, Gitea)
 - [ ] Observability: dashboards, alerts and SLOs
 
