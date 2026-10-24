@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  # Own resources for the monitoring stack (secrets, later dashboards and ServiceMonitors),
+  # next to the kube-prometheus-stack chart app, like cert-manager + cert-manager-issuers.
+  source:
+    repoURL: https://github.com/pablofc18/homelab-gitops.git
+    path: manifests/monitoring
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Uses the SopsSecret CRD from sops-secrets-operator, see cert-manager-issuers.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
