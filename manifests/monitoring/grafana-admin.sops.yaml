@@ -1,0 +1,29 @@
+# Grafana admin credentials, consumed through grafana.admin.existingSecret in
+# apps/kube-prometheus-stack.yaml. Read the password locally with:
+#   sops -d --extract '["spec"]["secretTemplates"][0]["stringData"]["admin-password"]' manifests/monitoring/grafana-admin.sops.yaml
+apiVersion: isindir.github.com/v1alpha3
+kind: SopsSecret
+metadata:
+  name: grafana-admin
+  namespace: monitoring
+spec:
+  secretTemplates:
+    - name: grafana-admin
+      stringData:
+        admin-user: ENC[AES256_GCM,data:cSU6nTY=,iv:zMid8ep6aw5W/FRsszmnCPBZ+PNhVZreae9A77skEBA=,tag:+VPbAXhCBHz4j7UGAaWSKA==,type:str]
+        admin-password: ENC[AES256_GCM,data:GCqbwgLbAhB8NpOGEjj538u1Nwo0QCUbdoglSmbSTvXz0hiDAZj6hA==,iv:plJkiK5vg5chNrKk6fHt+/JW4YDMkdk+4jKFjncIgiQ=,tag:1EUR+C98TTUdNP4oC7t8fg==,type:str]
+sops:
+  age:
+    - enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKVlFaU0JpVm00d2JjUzN1
+        OFkxTUxkNVE4OTZxS2pwcU50aFZtSThoNXc0ClhrK2NyZXFFa2pjU29lY3hFeEVn
+        ZkU0Q0p2eGNSRjZaRzJuMVdGNE9aQVkKLS0tIEp5OVFBOXEraGpRdElYZGdlczZa
+        Qm1VTXFjeEx6aFpIN29UUWlsUU1qYm8KvZM9E+dQ7ox6kMEcXdxKstZOZjEqSI/w
+        XgvoJAVrB6+yiTprXI4VqcW7kun1VWOMTevzCiTYJyRfXW25BWJD3w==
+        -----END AGE ENCRYPTED FILE-----
+      recipient: age1r2etq9cy42hwtkwungr8txlxgzm7n9qf4mgcttwgt94epe5h49hsx5zfhu
+  encrypted_regex: ^(data|stringData)$
+  lastmodified: "2026-10-24T18:47:36Z"
+  mac: ENC[AES256_GCM,data:kuUOCqNtssBwpAXoIoJOk+Oo8cK1XQRpWLHCNpLPEOg61tKZo6Aa2AtpwtEHBwEI5l3eymHsnvKibKxoqokmaFmN4XxaV/CqSush5EU3OrsxvpFYrUdwTDd+EWAaR+WgnzyBbn19J9RewCYte8PATt7TsMke8erPTL4JXu1/FQY=,iv:JQhnRQCrY+qoB5LJUAGxdqZPTjLDxgQkLdwP/tp5GuA=,tag:ki8MSrpR7qq2NEGHg+iqsw==,type:str]
+  version: 3.13.3

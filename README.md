@@ -55,6 +55,7 @@ homelab-gitops/
 │   ├── cert-manager.yaml
 │   ├── cert-manager-issuers.yaml
 │   ├── kube-prometheus-stack.yaml
+│   ├── monitoring.yaml
 │   ├── sops-secrets-operator.yaml
 │   ├── traefik.yaml
 │   └── whoami.yaml
@@ -177,8 +178,8 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] Renovate for automated dependency updates
 - [x] cert-manager (TLS) with a local CA
 - [x] kube-prometheus-stack: Prometheus, Alertmanager, node-exporter, kube-state-metrics
-- [ ] Secrets management with SOPS + age (in progress: operator deployed)
-- [ ] Grafana exposed via ingress, admin credentials from SOPS
+- [x] Secrets management with SOPS + age (sops-secrets-operator)
+- [x] Grafana at `https://grafana.localhost`, admin credentials from SOPS
 - [ ] First real applications (e.g. Vaultwarden, Gitea)
 - [ ] Observability: dashboards, alerts and SLOs
 

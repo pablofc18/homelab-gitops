@@ -11,9 +11,36 @@ spec:
     targetRevision: "92.11.0"
     helm:
       values: |
-        # Grafana comes in a later step, together with its Ingress and admin credentials.
         grafana:
-          enabled: false
+          # Admin credentials from the Secret created by manifests/monitoring/grafana-admin.sops.yaml.
+          # Without it the chart generates a random password with `lookup`, which ArgoCD's
+          # `helm template` cannot do, so the password would change on every sync.
+          admin:
+            existingSecret: grafana-admin
+          # The dashboard/datasource sidecars default to searching ALL namespaces, and the chart's
+          # ClusterRole then grants list/watch on every Secret in the cluster. Keep Grafana in its
+          # own namespace: dashboards are ConfigMaps in monitoring (chart's and manifests/monitoring).
+          rbac:
+            namespaced: true
+          sidecar:
+            dashboards:
+              searchNamespace: monitoring
+            datasources:
+              searchNamespace: monitoring
+          ingress:
+            enabled: true
+            ingressClassName: traefik
+            annotations:
+              cert-manager.io/cluster-issuer: homelab-ca
+            hosts:
+              - grafana.localhost
+            tls:
+              - hosts:
+                  - grafana.localhost
+                secretName: grafana-tls
+          grafana.ini:
+            server:
+              root_url: https://grafana.localhost
         # kind-specific: these control-plane components only expose metrics on the node's
         # 127.0.0.1, so Prometheus cannot reach them and their "down" alerts would always fire.
         kubeControllerManager:

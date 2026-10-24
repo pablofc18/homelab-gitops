@@ -55,8 +55,9 @@ misconfigurations:
       - kube-prometheus-stack.yaml
     statement: >-
       prometheus-operator generates the Prometheus and Alertmanager configuration as Secrets.
-      kube-state-metrics no longer reads Secrets (its "secrets" collector is disabled), so this
-      only covers the operator. The ignore is file-wide: re-check if another component adds it.
+      kube-state-metrics no longer reads Secrets (its "secrets" collector is disabled) and Grafana
+      uses a namespaced Role (rbac.namespaced), so this only covers the operator. The ignore is
+      file-wide: re-check with `trivy config` without --ignorefile when the chart or values change.
   - id: KSV-0056
     paths:
       - kube-prometheus-stack.yaml
