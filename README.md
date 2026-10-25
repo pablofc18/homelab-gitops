@@ -58,6 +58,7 @@ homelab-gitops/
 │   ├── monitoring.yaml
 │   ├── sops-secrets-operator.yaml
 │   ├── traefik.yaml
+│   ├── vaultwarden.yaml
 │   └── whoami.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
 ├── docs/                    # Extra documentation
@@ -133,6 +134,32 @@ make argocd-ui         # port-forward, keep it running
 ```
  
 Open <https://localhost:8080> (self-signed certificate warning is expected) and log in as `admin`.
+
+### Vaultwarden
+
+Bitwarden-compatible password manager at <https://vaultwarden.localhost>, with its data (SQLite) on a PersistentVolumeClaim. Test data only for now: see [Known limitations](#known-limitations).
+
+- Public signups are closed. Invite a user from the admin panel (`/admin` → *Users* → *Invite User*); with no SMTP configured nothing is emailed, but the invited address can then register at `/#/register`.
+- The admin panel password lives only in your own password manager. Git and the cluster only hold its Argon2id hash, in `manifests/vaultwarden/vaultwarden-admin.sops.yaml`.
+- Manage settings through the env vars in `manifests/vaultwarden/statefulset.yaml`, not by saving them in `/admin`: that writes `/data/config.json`, which overrides the env vars and is invisible to Git.
+
+Rotate the admin password (run in your own terminal; nothing is printed or written in plain text):
+
+```bash
+pw="$(openssl rand -base64 32)"
+printf '%s' "$pw" | wl-copy
+read -rp "Password copied. Save it in your password manager, then press Enter... "
+hash="$(printf '%s' "$pw" | argon2 "$(openssl rand -base64 32)" -e -id -k 65540 -t 3 -p 4)"
+sops set manifests/vaultwarden/vaultwarden-admin.sops.yaml \
+  '["spec"]["secretTemplates"][0]["stringData"]["admin-token"]' "\"$hash\""
+unset pw hash; wl-copy --clear
+```
+
+After the change is merged and synced, restart the pod: env vars are read only at container start, so an updated Secret is not picked up on its own.
+
+```bash
+kubectl rollout restart statefulset/vaultwarden -n vaultwarden
+```
  
 ### Tear down
  
@@ -167,7 +194,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 ## Known limitations
  
 - kind clusters are meant for development, not for staying up across reboots. After a reboot the node containers may need to be started again, or the cluster recreated with `make destroy && make up`.
-- No persistent data worth keeping yet. Stateful apps will need backups before they hold real data.
+- Vaultwarden data lives on kind's local-path storage: a directory inside one node container, deleted with the PVC or by `make destroy`, and with no backups yet. Do not store real passwords in it until backups are in place.
 
 ## Roadmap
  
@@ -181,7 +208,10 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] kube-prometheus-stack: Prometheus, Alertmanager, node-exporter, kube-state-metrics
 - [x] Secrets management with SOPS + age (sops-secrets-operator)
 - [x] Grafana at `https://grafana.localhost`, admin credentials from SOPS
-- [ ] First real applications (e.g. Vaultwarden, Gitea)
+- [x] HTTP always redirected to HTTPS at the Traefik entrypoint
+- [x] Vaultwarden at `https://vaultwarden.localhost`: StatefulSet + PVC, admin token from SOPS
+- [ ] Backups for stateful apps
+- [ ] Gitea
 - [ ] Observability: dashboards, alerts and SLOs
 
 ## What I'm learning
