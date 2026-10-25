@@ -1,4 +1,4 @@
-# Vaultwarden admin panel (/admin) token, consumed as ADMIN_TOKEN by the Deployment.
+# Vaultwarden admin panel (/admin) token, consumed as ADMIN_TOKEN by the StatefulSet.
 # The value is an Argon2id PHC hash, not the password: Vaultwarden only stores and compares
 # the hash, and you log in with the password kept in your own password manager.
 apiVersion: isindir.github.com/v1alpha3
