@@ -1,0 +1,16 @@
+# Vaultwarden keeps everything (SQLite db, attachments, RSA keys) in /data.
+# On kind the "standard" StorageClass is rancher's local-path-provisioner: the volume is a
+# directory on the node the pod lands on, and it is deleted with the PVC (reclaimPolicy
+# Delete) or with the cluster. Not a substitute for backups.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vaultwarden-data
+  namespace: vaultwarden
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
