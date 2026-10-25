@@ -76,7 +76,8 @@ make argocd-password    # initial admin password
 make sops-key           # load the local age private key into the cluster (also run by make up)
 make argocd-ui          # port-forward UI to https://localhost:8080
 make destroy            # delete the cluster
-curl -i http://localhost  # expect 404 from Traefik for unknown hosts
+curl -i http://localhost    # expect 308 redirect to https (port 80 only redirects)
+curl -ik https://localhost  # expect 404 from Traefik for unknown hosts
 curl --cacert homelab-ca.crt https://whoami.localhost  # TLS end to end (CA from Secret homelab-ca in cert-manager)
 ```
 

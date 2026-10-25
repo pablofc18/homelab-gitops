@@ -123,15 +123,17 @@ How a request reaches a service:
 
 ```mermaid
 flowchart LR
-    B[Browser / curl] -->|localhost:80| H[Host port 80]
-    H -->|Docker port mapping| N[control-plane node :80]
+    B[Browser / curl] -->|localhost:443| H[Host port 443]
+    H -->|Docker port mapping| N[control-plane node :443]
     N -->|hostPort| T[Traefik pod]
     T -->|Ingress rule match| S[Service]
     S --> P[Application pod]
     T -.->|no matching rule| X[404]
+    B -.->|localhost:80| R[308 redirect to https]
 ```
 
-- For hosts without an Ingress rule, Traefik answers `404`. That confirms the path from host to Traefik works.
+- Port 80 only redirects: the `web` entrypoint answers every request with a permanent `308` to the same URL over HTTPS, so no service is ever served in plain text. `308` (not `301`) keeps the method and body, so a redirected `POST` stays a `POST`.
+- For hosts without an Ingress rule, Traefik answers `404` over HTTPS, with its built-in self-signed default certificate (no Ingress means no cert-manager certificate). That confirms the path from host to Traefik works.
 - TLS terminates at Traefik. An Ingress with the `cert-manager.io/cluster-issuer: homelab-ca` annotation and a `spec.tls` section makes cert-manager create a `Certificate` (owned by the Ingress) and store it in the Secret named in `spec.tls`, which Traefik serves on port 443. `whoami.localhost` is the reference example.
 - Hostnames use `*.localhost`, which resolves to `127.0.0.1` without DNS (RFC 6761). kind-specific: a real setup would use a real domain and an ACME issuer.
 - Inside the cluster, Traefik's own Service is `ClusterIP`: external traffic does not enter through it, but through the `hostPort`.

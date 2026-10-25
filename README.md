@@ -102,10 +102,11 @@ make up
 make status
 ```
  
-Verify the ingress is listening (a `404` from Traefik is the expected response for unknown hosts):
+Verify the ingress is listening. Plain HTTP is always redirected to HTTPS (`308`), and a `404` from Traefik is the expected response for unknown hosts (`-k` because an unknown host gets Traefik's self-signed default certificate):
  
 ```bash
 curl -i http://localhost
+curl -ik https://localhost
 ```
  
 Verify TLS end to end with the `whoami` test app. Its certificate is signed by the lab's own CA, so pass that CA to `curl`:
