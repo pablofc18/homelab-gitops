@@ -1,0 +1,29 @@
+# HTTPS is required, not optional: the web vault encrypts in the browser with the WebCrypto
+# API, which browsers only expose in a secure context. cert-manager issues the certificate
+# from the homelab CA, as for whoami.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+  annotations:
+    cert-manager.io/cluster-issuer: homelab-ca
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - vaultwarden.localhost
+      secretName: vaultwarden-tls
+  rules:
+    - host: vaultwarden.localhost
+      http:
+        paths:
+          # Also carries the WebSocket live sync (/notifications/hub), which Traefik
+          # proxies without extra configuration.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vaultwarden
+                port:
+                  name: http
