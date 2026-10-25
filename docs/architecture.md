@@ -35,7 +35,7 @@ flowchart TB
 | Host | Docker, Linux | Manual (my workstation) |
 | Kubernetes | kind cluster (3 nodes as containers) | `make up` / `bootstrap/kind-config.yaml` |
 | Platform | ArgoCD, Traefik | ArgoCD itself (Traefik) and bootstrap (ArgoCD) |
-| Applications | Future services | ArgoCD, from `apps/` |
+| Applications | whoami (smoke test), Vaultwarden | ArgoCD, from `apps/` |
 
 ## 3. Cluster topology
 
@@ -150,7 +150,25 @@ flowchart LR
 | `updateStrategy.rollingUpdate: maxUnavailable: 1, maxSurge: 0` | With `hostPort` on a single node, the default surge rollout deadlocks: the new pod stays `Pending` because the old one holds ports 80/443. Replacing the pod costs a few seconds of downtime per upgrade |
 | `providers.kubernetesIngress.ingressEndpoint.ip: 127.0.0.1` (and `publishedService.enabled: false`) | Traefik writes this address into every Ingress status. Copying it from the `ClusterIP` Service would leave it empty, and ArgoCD reports Ingresses without an address as `Progressing` forever |
 
-## 9. Repository layout and ownership
+## 9. Persistent storage
+
+Vaultwarden is the first stateful app: its SQLite database, attachments and RSA keys live in `/data`, backed by a PersistentVolumeClaim.
+
+```mermaid
+flowchart LR
+    STS[StatefulSet vaultwarden] --> POD[Pod vaultwarden-0]
+    POD -->|mounts /data| PVC[PVC vaultwarden-data<br/>declared in Git]
+    PVC -->|bound by local-path-provisioner| PV[PV pvc-...]
+    PV -->|hostPath + nodeAffinity| DIR[Directory on homelab-worker2]
+```
+
+- **Dynamic provisioning:** the repo only declares the claim (1Gi, `ReadWriteOnce`, StorageClass `standard`). kind's local-path-provisioner creates the PV. Its `volumeBindingMode: WaitForFirstConsumer` keeps the claim `Pending` until a pod uses it, so the directory is created on the node the scheduler picks.
+- **The volume is pinned to that node:** the PV has a `nodeAffinity` for it, so the pod always runs there. If the node is lost, so is the data. kind-specific: a real cluster would use a network CSI driver (Longhorn, Ceph, a cloud disk) that can attach the volume elsewhere.
+- **Pod and volume have separate lifecycles:** deleting the pod keeps the data; deleting the PVC (or removing `pvc.yaml` from Git, which `prune` turns into a deletion) or the cluster destroys it, because the reclaim policy is `Delete`.
+- **At most one pod:** `ReadWriteOnce` limits mounts to one **node**, not one pod, so it does not stop two pods on the same node from opening the database. A Deployment's ReplicaSet starts a replacement as soon as a pod is deleted, while the old one is still terminating. A StatefulSet only recreates `vaultwarden-0` once the old pod is gone. The cost is availability: if the node dies, the pod is not replaced until Kubernetes confirms the old one no longer exists. `ReadWriteOncePod` would enforce this at the volume level, but needs a CSI driver.
+- **Not in Git:** the data itself, and `/data/config.json` if settings are saved in the admin panel (it overrides the env vars declared in Git, and `selfHeal` cannot see it).
+
+## 10. Repository layout and ownership
 
 | Path | Purpose | Applied by |
 |---|---|---|
@@ -162,7 +180,7 @@ flowchart LR
 
 `kind-config.yaml` is deliberately kept out of `apps/`: it is not a Kubernetes resource and exists before the cluster does.
 
-## 10. Design decisions and trade-offs
+## 11. Design decisions and trade-offs
 
 | Decision | Alternative | Reasoning |
 |---|---|---|
@@ -179,8 +197,13 @@ flowchart LR
 | cert-manager for the prometheus-operator webhook certificate | Chart's Helm hook Jobs (`kube-webhook-certgen`) | Hook Jobs are re-run by ArgoCD on every sync. cert-manager is already in the cluster and keeps the certificate renewed. |
 | sops-secrets-operator (decrypt in the cluster) | KSOPS / helm-secrets plugins in ArgoCD's repo-server | Follows ArgoCD's recommendation of destination-cluster secret management: ArgoCD only sees encrypted resources. Needs no changes to the ArgoCD installation, which the Makefile applies from the upstream manifest. |
 | Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`, which is not managed from Git yet. Retrying is simpler and self-healing. |
+| HTTP → HTTPS redirect on Traefik's `web` entrypoint | `redirectScheme` middleware per Ingress | Secure by default: no app can forget it, and port 80 never serves content. Permanent `308` keeps the method of redirected API calls. |
+| Vaultwarden from plain manifests | Community Helm chart | No official chart, and it is a single container: writing the StatefulSet, PVC and Ingress by hand shows every piece. Renovate already covers images in `manifests/`. |
+| Vaultwarden as a StatefulSet | Deployment with `strategy: Recreate` | `Recreate` only applies to rollouts; when a pod is deleted the ReplicaSet starts a replacement immediately, so two pods briefly share the SQLite volume. The StatefulSet guarantees at most one. |
+| Existing PVC as a plain volume | `volumeClaimTemplates` | A template would create a new, empty claim owned by the StatefulSet controller instead of ArgoCD. One SQLite replica never needs a claim per pod. |
+| Vaultwarden `ADMIN_TOKEN` as an Argon2id hash | Plain-text token | A Secret is readable by anyone allowed to get Secrets in the namespace; with a hash, leaking it does not leak the password. Argon2id is memory-hard, which makes brute-forcing expensive. |
 
-## 11. Failure modes and recovery
+## 12. Failure modes and recovery
 
 | Scenario | Behaviour | Recovery |
 |---|---|---|
@@ -189,10 +212,13 @@ flowchart LR
 | Host reboot | Port-forwards stop; kind node containers may not restart cleanly | `docker start` the node containers, or `make destroy && make up` |
 | Cluster is destroyed | All in-cluster state is lost | `make up` rebuilds everything from Git |
 | Bad commit breaks an app | App becomes `Degraded` or `OutOfSync` | `git revert` and push |
+| Vaultwarden pod deleted or restarted | `vaultwarden-0` is recreated on the same node with the same volume; data is kept | None needed |
+| Node holding the Vaultwarden volume is lost | Pod cannot be rescheduled elsewhere; local data is gone | Restore from backup (not implemented yet) |
+| A Secret consumed as env vars is rotated | Running pods keep the old value until they restart | `kubectl rollout restart` (no declared state changes, so ArgoCD does not revert it) |
 
-State that is **not** stored in Git (application data, persistent volumes) is lost when the cluster is destroyed. Stateful services will require backups before they are used for real data.
+State that is **not** stored in Git (application data, persistent volumes) is lost when the cluster is destroyed. Vaultwarden only holds test data until backups are in place.
 
-## 12. Security considerations
+## 13. Security considerations
 
 Current state and planned improvements:
 
@@ -203,12 +229,12 @@ Current state and planned improvements:
 - Supply chain: every chart, CLI tool and the ArgoCD manifest are pinned to exact versions, and GitHub Actions to commit digests. CI validates (`kubeconform`) and scans (Trivy) the rendered manifests on every PR.
 - Renovate proposes version bumps as pull requests, so every update goes through the same CI checks before it reaches `main`. New releases must be at least 3 days old (`minimumReleaseAge`), which leaves time for a compromised release to be detected and pulled before it is proposed.
 
-## 13. Planned evolution
+## 14. Planned evolution
 
 1. Pin all versions and add Renovate.
 2. Add CI validation (`yamllint`, `kubeconform`, Trivy).
 3. Add cert-manager and TLS.
 4. Add kube-prometheus-stack for metrics, dashboards and alerting.
 5. Add SOPS + age for secrets.
-6. Deploy real applications.
+6. Deploy real applications: Vaultwarden (done), backups for stateful apps, Gitea.
 7. Phase 2: move to a multi-VM k3s cluster provisioned with Terraform (libvirt) and configured with Ansible, keeping the same GitOps repo.
