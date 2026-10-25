@@ -36,9 +36,16 @@ spec:
             # Public URL, used to build links in emails, attachments and WebAuthn/U2F.
             - name: DOMAIN
               value: "https://vaultwarden.localhost"
-            # Open for now to create the first account; to be closed in a later step.
+            # No public registration: new users are invited from the admin panel.
             - name: SIGNUPS_ALLOWED
-              value: "true"
+              value: "false"
+            # Enables /admin. Treat the panel as read-only for settings: saving there writes
+            # /data/config.json, which overrides these env vars and is invisible to Git.
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vaultwarden-admin
+                  key: admin-token
           ports:
             - name: http
               containerPort: 8080

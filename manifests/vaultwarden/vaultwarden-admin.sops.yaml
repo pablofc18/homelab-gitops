@@ -1,0 +1,28 @@
+# Vaultwarden admin panel (/admin) token, consumed as ADMIN_TOKEN by the Deployment.
+# The value is an Argon2id PHC hash, not the password: Vaultwarden only stores and compares
+# the hash, and you log in with the password kept in your own password manager.
+apiVersion: isindir.github.com/v1alpha3
+kind: SopsSecret
+metadata:
+  name: vaultwarden-admin
+  namespace: vaultwarden
+spec:
+  secretTemplates:
+    - name: vaultwarden-admin
+      stringData:
+        admin-token: ENC[AES256_GCM,data:j5CYm8koKXwOcRLIgwo369aBVifqfLmFGUhPmex3j801iD5ObVXWRdCCzOrEqiywj9g5Z5l5GUrTwV7Gvx5SjpHHjLw3ZLpXscDBD2ojmI/4jGGTQPfRnezq23yydwLKd8OdP39qPeLtiWJa95Tagw+NIWLBckEIahkfTPeW3pL2vc7mNaI=,iv:/RuNvUaskSxj4qmtmtuwF771Ci+qx1g/4eDatzNEZKA=,tag:u2aLrQlNgJALOC0ndqGkCw==,type:str]
+sops:
+  age:
+    - enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJTWpzMzlDY3J0dE1GQ3Vq
+        R0ExZTRKVytEVXB5VjZSaG5BSTBhYWl3c0JRCmtlcElrL3RzaCt1bXVqT1RhYmtX
+        S1JQT29Jd21NdWp5d0J2bjhOZStxbmMKLS0tIGduQ0U2a1VkZEtWQmdCMlRLVS9s
+        Zmt4VFhpK2l2MjJ6VXY1YXJJN1pVWXMK7hOkVXgMEWDDsMEkPnJmePk6gbooM8py
+        X+26Tzcmf7TVcjk0wsENWeIKgXUlhDX+9Vx4xCydzGM7Hi8nZkHfCg==
+        -----END AGE ENCRYPTED FILE-----
+      recipient: age1r2etq9cy42hwtkwungr8txlxgzm7n9qf4mgcttwgt94epe5h49hsx5zfhu
+  encrypted_regex: ^(data|stringData)$
+  lastmodified: "2026-10-25T10:16:41Z"
+  mac: ENC[AES256_GCM,data:rRbdmY0Z4iBbQNka9qK1+HpXRlA0XA+tv7xXT9iyDgGVEk9PI87S/RvXWva8pysifsqIHsAJAfmGQNk9PKYRdFnxvVV3c3LuDuWzMUM31rAOoLN/YxBCva7PoTzCPsnVSKzmH9TKMB+bXfaDqSJ9ic/cpuJEL26WtjEt+xRRhnk=,iv:6WMkBGZ0k/JvdUxUD83ToP0VGkefCaFY9bmcllfmCxk=,tag:Cx0EgbTdXIyoXTj7m1ExYA==,type:str]
+  version: 3.13.3
