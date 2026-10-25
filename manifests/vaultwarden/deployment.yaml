@@ -33,6 +33,9 @@ spec:
             # The image listens on 80 by default; non-root users cannot bind ports below 1024.
             - name: ROCKET_PORT
               value: "8080"
+            # Public URL, used to build links in emails, attachments and WebAuthn/U2F.
+            - name: DOMAIN
+              value: "https://vaultwarden.localhost"
             # Open for now to create the first account; to be closed in a later step.
             - name: SIGNUPS_ALLOWED
               value: "true"
