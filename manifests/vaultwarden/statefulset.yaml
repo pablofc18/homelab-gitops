@@ -1,15 +1,18 @@
 # Self-hosted Bitwarden-compatible password manager, backed by SQLite on a PVC.
+# A StatefulSet, not a Deployment: it guarantees at most one pod per identity, so a
+# replacement pod is only created once the old one is gone. A Deployment's ReplicaSet
+# starts the replacement right away, and ReadWriteOnce does not prevent it (it limits
+# mounts to one node, not one pod).
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: vaultwarden
   namespace: vaultwarden
 spec:
   replicas: 1
-  # SQLite on a ReadWriteOnce volume: never run two pods at once, so stop the old pod
-  # before starting the new one instead of a rolling update.
-  strategy:
-    type: Recreate
+  # Required field. Pods get stable DNS names only with a headless Service; nothing
+  # resolves this pod by name, so the regular Service is enough.
+  serviceName: vaultwarden
   selector:
     matchLabels:
       app.kubernetes.io/name: vaultwarden
@@ -71,6 +74,9 @@ spec:
               path: /alive
               port: http
       volumes:
+        # The existing PVC, kept declared in Git, instead of volumeClaimTemplates: a
+        # template would create a new, empty data-vaultwarden-0 claim managed by the
+        # StatefulSet controller, and a single SQLite replica never needs one per pod.
         - name: data
           persistentVolumeClaim:
             claimName: vaultwarden-data
