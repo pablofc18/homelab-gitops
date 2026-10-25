@@ -17,6 +17,14 @@ spec:
         ports:
           web:
             hostPort: 80
+            # Every request on :80 gets a permanent redirect (308) to the same URL on
+            # websecure, before any router matches. Port 80 only exists to redirect.
+            http:
+              redirections:
+                entryPoint:
+                  to: websecure
+                  scheme: https
+                  permanent: true
           websecure:
             hostPort: 443
         nodeSelector:
