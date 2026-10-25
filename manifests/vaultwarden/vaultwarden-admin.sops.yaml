@@ -10,7 +10,7 @@ spec:
   secretTemplates:
     - name: vaultwarden-admin
       stringData:
-        admin-token: ENC[AES256_GCM,data:j5CYm8koKXwOcRLIgwo369aBVifqfLmFGUhPmex3j801iD5ObVXWRdCCzOrEqiywj9g5Z5l5GUrTwV7Gvx5SjpHHjLw3ZLpXscDBD2ojmI/4jGGTQPfRnezq23yydwLKd8OdP39qPeLtiWJa95Tagw+NIWLBckEIahkfTPeW3pL2vc7mNaI=,iv:/RuNvUaskSxj4qmtmtuwF771Ci+qx1g/4eDatzNEZKA=,tag:u2aLrQlNgJALOC0ndqGkCw==,type:str]
+        admin-token: ENC[AES256_GCM,data:6ywRo4Lc5smcjFGlsCG50JaoTU1e9BI8pUszpgNbgeoIa2pMWCdlclL4Q3uG1+WXRJWN8Xf9Ha6VUcgArpGF0Q8F5ySzyn4Ek/YGjboVvuyhdwmDk/6b219v7m2TG9hqtBP/67ywUzI1ZhELWZo/nx2jwIbdvW84EaeE9rO/26wRCxAzF8w=,iv:lHHBv/kveFVOI+DjdDVV7DPhilsVAPJFMuVTPU4/vT0=,tag:JsTnZhPtdxbeqfCMtDeQJQ==,type:str]
 sops:
   age:
     - enc: |
@@ -23,6 +23,6 @@ sops:
         -----END AGE ENCRYPTED FILE-----
       recipient: age1r2etq9cy42hwtkwungr8txlxgzm7n9qf4mgcttwgt94epe5h49hsx5zfhu
   encrypted_regex: ^(data|stringData)$
-  lastmodified: "2026-10-25T10:16:41Z"
-  mac: ENC[AES256_GCM,data:rRbdmY0Z4iBbQNka9qK1+HpXRlA0XA+tv7xXT9iyDgGVEk9PI87S/RvXWva8pysifsqIHsAJAfmGQNk9PKYRdFnxvVV3c3LuDuWzMUM31rAOoLN/YxBCva7PoTzCPsnVSKzmH9TKMB+bXfaDqSJ9ic/cpuJEL26WtjEt+xRRhnk=,iv:6WMkBGZ0k/JvdUxUD83ToP0VGkefCaFY9bmcllfmCxk=,tag:Cx0EgbTdXIyoXTj7m1ExYA==,type:str]
+  lastmodified: "2026-10-25T10:25:25Z"
+  mac: ENC[AES256_GCM,data:9QQvCtF0f+h/xziZNH33EeyAks5VSKUQPCvTi7RSFddd7SiOBGNnwz815nCw/rq850nsFEK4xUYVQ24616u52B+XB0sZzRpQdRqbKB1phpuOm2Ey9tzw05q+2v3m3t0/UvcyTsPFaQdM1kSvntxlawr45tXytyO5deIp9rMuQoQ=,iv:MMMubL53kfe8AcdSI7atbvMZSKqyw1DIanEbpgJ2ei0=,tag:0ivhrCAwY2o7Ba4mEMB9uw==,type:str]
   version: 3.13.3
