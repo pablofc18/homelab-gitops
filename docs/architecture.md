@@ -35,7 +35,7 @@ flowchart TB
 | Host | Docker, Linux | Manual (my workstation) |
 | Kubernetes | kind cluster (3 nodes as containers) | `make up` / `bootstrap/kind-config.yaml` |
 | Platform | ArgoCD, Traefik | ArgoCD itself (Traefik) and bootstrap (ArgoCD) |
-| Applications | whoami (smoke test), Vaultwarden | ArgoCD, from `apps/` |
+| Applications | whoami (smoke test), Vaultwarden, Gitea | ArgoCD, from `apps/` |
 
 ## 3. Cluster topology
 
@@ -202,6 +202,11 @@ flowchart LR
 | Vaultwarden as a StatefulSet | Deployment with `strategy: Recreate` | `Recreate` only applies to rollouts; when a pod is deleted the ReplicaSet starts a replacement immediately, so two pods briefly share the SQLite volume. The StatefulSet guarantees at most one. |
 | Existing PVC as a plain volume | `volumeClaimTemplates` | A template would create a new, empty claim owned by the StatefulSet controller instead of ArgoCD. One SQLite replica never needs a claim per pod. |
 | Vaultwarden `ADMIN_TOKEN` as an Argon2id hash | Plain-text token | A Secret is readable by anyone allowed to get Secrets in the namespace; with a hash, leaking it does not leak the password. Argon2id is memory-hard, which makes brute-forcing expensive. |
+| Gitea from the official Helm chart | Plain manifests, as for Vaultwarden | Gitea needs more wiring (init containers rendering `app.ini`, admin user bootstrap), which the chart maintains. Its own resources (the admin `SopsSecret`) live in the companion app `gitea-secrets`, like `monitoring` next to kube-prometheus-stack. |
+| Gitea on SQLite, sessions in the database, cache in memory, queues in LevelDB | Chart defaults: PostgreSQL HA and a Valkey cluster | Single-user lab: one pod and one volume instead of several stateful pods. Moving to PostgreSQL later is a database migration, not a redesign. |
+| Gitea as the chart's Deployment with `strategy: Recreate` | StatefulSet (as for Vaultwarden) | The chart does not offer a StatefulSet. `Recreate` covers rollouts; a deleted or evicted pod can still overlap its replacement for a few seconds on the same volume, which holds SQLite, LevelDB queues, repositories and `app.ini`. The new pod cannot take the LevelDB lock and restarts until the old one is gone. Accepted for a single-user lab. |
+| Gitea PVC annotated `argocd.argoproj.io/sync-options: Delete=false` | PVC declared in Git, as for Vaultwarden | The chart creates the PVC, so a release that renamed it would make ArgoCD prune it (and local-path delete the data). The annotation keeps the chart's own PVC while telling ArgoCD never to delete it. |
+| Gitea clone over HTTPS only | SSH through a new host port | kind-specific: SSH would need another `extraPortMappings` entry (cluster rebuild) or a TCP route in Traefik. HTTPS reuses the existing ingress and TLS. |
 
 ## 12. Failure modes and recovery
 
@@ -214,9 +219,11 @@ flowchart LR
 | Bad commit breaks an app | App becomes `Degraded` or `OutOfSync` | `git revert` and push |
 | Vaultwarden pod deleted or restarted | `vaultwarden-0` is recreated on the same node with the same volume; data is kept | None needed |
 | Node holding the Vaultwarden volume is lost | Pod cannot be rescheduled elsewhere; local data is gone | Restore from backup (not implemented yet) |
+| Gitea pod deleted or evicted | The Deployment starts a replacement at once; it restarts a few times (LevelDB lock) until the old pod is gone, then runs on the same volume | None needed |
+| Node holding the Gitea volume is lost | Pod cannot be rescheduled elsewhere; repositories are gone | Restore from backup (not implemented yet) |
 | A Secret consumed as env vars is rotated | Running pods keep the old value until they restart | `kubectl rollout restart` (no declared state changes, so ArgoCD does not revert it) |
 
-State that is **not** stored in Git (application data, persistent volumes) is lost when the cluster is destroyed. Vaultwarden only holds test data until backups are in place.
+State that is **not** stored in Git (application data, persistent volumes) is lost when the cluster is destroyed. Vaultwarden and Gitea only hold test data until backups are in place.
 
 ## 13. Security considerations
 
@@ -236,5 +243,5 @@ Current state and planned improvements:
 3. Add cert-manager and TLS.
 4. Add kube-prometheus-stack for metrics, dashboards and alerting.
 5. Add SOPS + age for secrets.
-6. Deploy real applications: Vaultwarden (done), backups for stateful apps, Gitea.
+6. Deploy real applications: Vaultwarden and Gitea (done); backups for stateful apps (postponed).
 7. Phase 2: move to a multi-VM k3s cluster provisioned with Terraform (libvirt) and configured with Ansible, keeping the same GitOps repo.

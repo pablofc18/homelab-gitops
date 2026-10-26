@@ -54,6 +54,8 @@ homelab-gitops/
 ├── apps/                    # One ArgoCD Application per service (watched by root)
 │   ├── cert-manager.yaml
 │   ├── cert-manager-issuers.yaml
+│   ├── gitea.yaml
+│   ├── gitea-secrets.yaml
 │   ├── kube-prometheus-stack.yaml
 │   ├── monitoring.yaml
 │   ├── sops-secrets-operator.yaml
@@ -160,6 +162,24 @@ After the change is merged and synced, restart the pod: env vars are read only a
 ```bash
 kubectl rollout restart statefulset/vaultwarden -n vaultwarden
 ```
+
+### Gitea
+
+Self-hosted Git service at <https://gitea.localhost>, backed by SQLite on a PersistentVolumeClaim. Like Vaultwarden, it only holds test data (see [Known limitations](#known-limitations)).
+
+- Log in as `gitea_admin`. Read the password locally (it is generated randomly and only stored encrypted in Git):
+
+  ```bash
+  sops -d --extract '["spec"]["secretTemplates"][0]["stringData"]["password"]' manifests/gitea-secrets/gitea-admin.sops.yaml
+  ```
+
+- To change it, edit the file with `sops manifests/gitea-secrets/gitea-admin.sops.yaml` and merge. The chart resets the admin password from the Secret on every pod start (`passwordMode: keepUpdated`), but an updated Secret does not restart the pod, so run `kubectl rollout restart deployment/gitea -n gitea` once it is synced. Do not change the `username`: the admin is looked up by name, so a new one would be created and the old admin left active with its last password.
+- Public sign-up is disabled: create users from *Site Administration* → *User Accounts*.
+- Clone over HTTPS only (SSH is disabled, it would need another host port). Git needs the lab CA:
+
+  ```bash
+  git -c http.sslCAInfo=homelab-ca.crt clone https://gitea.localhost/<user>/<repo>.git
+  ```
  
 ### Tear down
  
@@ -194,7 +214,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 ## Known limitations
  
 - kind clusters are meant for development, not for staying up across reboots. After a reboot the node containers may need to be started again, or the cluster recreated with `make destroy && make up`.
-- Vaultwarden data lives on kind's local-path storage: a directory inside one node container, deleted with the PVC or by `make destroy`, and with no backups yet. Do not store real passwords in it until backups are in place.
+- Vaultwarden and Gitea data live on kind's local-path storage: a directory inside one node container, deleted with the PVC or by `make destroy`, and with no backups yet. Do not store real passwords or repositories in them until backups are in place.
 
 ## Roadmap
  
@@ -210,8 +230,8 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] Grafana at `https://grafana.localhost`, admin credentials from SOPS
 - [x] HTTP always redirected to HTTPS at the Traefik entrypoint
 - [x] Vaultwarden at `https://vaultwarden.localhost`: StatefulSet + PVC, admin token from SOPS
-- [ ] Backups for stateful apps
-- [ ] Gitea
+- [x] Gitea at `https://gitea.localhost`: Helm chart with SQLite, admin credentials from SOPS
+- [ ] Backups for stateful apps (postponed)
 - [ ] Observability: dashboards, alerts and SLOs
 
 ## What I'm learning

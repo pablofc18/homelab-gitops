@@ -1,0 +1,30 @@
+# Gitea admin credentials, consumed through gitea.admin.existingSecret in apps/gitea.yaml.
+# The chart resets the password from this Secret on every start (passwordMode: keepUpdated).
+# Read the password locally with:
+#   sops -d --extract '["spec"]["secretTemplates"][0]["stringData"]["password"]' manifests/gitea-secrets/gitea-admin.sops.yaml
+apiVersion: isindir.github.com/v1alpha3
+kind: SopsSecret
+metadata:
+  name: gitea-admin
+  namespace: gitea
+spec:
+  secretTemplates:
+    - name: gitea-admin
+      stringData:
+        username: ENC[AES256_GCM,data:q7m6EOYmHRnukBo=,iv:hHewgXpBzo2wX/5e+JtM1+SV0sWDrZ7gMlgwLNAJ2ps=,tag:w8WkUreeKOaDTzlxlTfDlQ==,type:str]
+        password: ENC[AES256_GCM,data:FLHXSvXTbdH/rI6sw1XPUJNRejoKHJLnAXPDinZiHbfrWVAFhV9dwbwA1rA=,iv:t5IM+n/ksyiqs+mow78Jm1mhaz31toCS0mPY0x1Jteo=,tag:wnJ66M3LGUq4PlCEVkzEVg==,type:str]
+sops:
+  age:
+    - enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWWmJ2VEVRbmg1WnRiRUNs
+        eHgrOWZmSGF3SHZLdXQrUUJ2Z1NNQ1pJcWdVCklSanVkSkNNN0R0dlNKaFVyMmpC
+        MStpMlpzd2tkMHJuRS9nM0NzVEpvMk0KLS0tIFBkL0wybE9ZS2lOMklzbjFoaDh2
+        aGhUTW1JZDNHR01RdERPZkFwdFY5encKJP3vROpCWB6+hVEm4CRKI9XUAheZPrwM
+        qIfhpi5bj9MxACP9yr+w1dloqYGOClvQOCzi0I4ozm/U2W+KrnjWXA==
+        -----END AGE ENCRYPTED FILE-----
+      recipient: age1r2etq9cy42hwtkwungr8txlxgzm7n9qf4mgcttwgt94epe5h49hsx5zfhu
+  encrypted_regex: ^(data|stringData)$
+  lastmodified: "2026-10-26T18:31:19Z"
+  mac: ENC[AES256_GCM,data:+wZ2kEhbfC0KLggNMlQRBcBukZDAPR9+jnpfJRjeR1bcz8SX0Ak9PUcYElhzdz7yPj30HfkCoiOaWJ5B7M8BFN3vnAcSlXajLjRd7z3uecagx95xI6VWbdHIIqCR6JiuE56jtBwDFOg9jK/kj4fHrrhZlz9IL4/lDEOV5s0ay00=,iv:8KpHLgcvVVAmOH5GWijBkJJXwHGmj6+6T/H27AS7/oo=,tag:F3RlEcn+NwsQ/8eDBwIpQA==,type:str]
+  version: 3.13.3
