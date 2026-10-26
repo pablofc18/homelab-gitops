@@ -1,0 +1,135 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://dl.gitea.com/charts/
+    chart: gitea
+    # The image tag comes from the chart's appVersion (gitea:1.27.0-rootless). No image.digest:
+    # Renovate bumps the chart version, and a digest pinned here would keep the old image.
+    targetRevision: "12.7.0"
+    helm:
+      values: |
+        # Single-user lab: SQLite on the PVC instead of the chart defaults (PostgreSQL HA and a
+        # Valkey cluster, several stateful pods each). Sessions go to the database, cache to
+        # memory and queues to LevelDB on the same volume, so nothing else is needed.
+        valkey-cluster:
+          enabled: false
+        valkey:
+          enabled: false
+        postgresql-ha:
+          enabled: false
+        postgresql:
+          enabled: false
+        # One volume holds SQLite, the LevelDB queues, the git repositories and app.ini: stop the
+        # old pod before starting the new one. The chart only offers a Deployment, so unlike
+        # Vaultwarden's StatefulSet a deleted or evicted pod is replaced while the old one still
+        # runs: for a few seconds the new pod's init containers touch the shared volume and its
+        # main container cannot take the LevelDB lock, so it restarts until the old pod is gone.
+        strategy:
+          type: Recreate
+        persistence:
+          size: 2Gi
+          storageClass: standard
+          # The chart creates this PVC, so a chart release that renames it would make ArgoCD
+          # prune it, and local-path would delete every repository. Delete=false tells ArgoCD
+          # never to delete it (helm.sh/resource-policy is kept by the chart default).
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false
+        # Own ServiceAccount with automountServiceAccountToken: false. The chart default uses
+        # the namespace's "default" ServiceAccount, which mounts an API token Gitea never uses.
+        serviceAccount:
+          create: true
+        # The rootless image runs as the "git" user (UID/GID 1000) baked into it. On kind the
+        # volume is writable because local-path creates it with mode 0777 (fsGroup is not applied
+        # to hostPath volumes). On storage that honours fsGroup, OnRootMismatch skips the
+        # recursive chown of every repository file on each start when ownership is already right.
+        podSecurityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: OnRootMismatch
+          seccompProfile:
+            type: RuntimeDefault
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: "1"
+            memory: 512Mi
+        initContainers:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+        ingress:
+          enabled: true
+          className: traefik
+          annotations:
+            cert-manager.io/cluster-issuer: homelab-ca
+          hosts:
+            - host: gitea.localhost
+              paths:
+                - path: /
+          tls:
+            - hosts:
+                - gitea.localhost
+              secretName: gitea-tls
+        # The helm test Pod uses busybox:latest (unpinned) and is never run by ArgoCD.
+        test:
+          enabled: false
+        gitea:
+          # Credentials from the Secret created by manifests/gitea-secrets/gitea-admin.sops.yaml.
+          # keepUpdated resets the password from the Secret on every start, so Git stays the
+          # source of truth for it (as for Grafana). The admin is looked up by username: changing
+          # it in the Secret creates a second admin and leaves the old one active.
+          admin:
+            existingSecret: gitea-admin
+            email: admin@gitea.localhost
+            passwordMode: keepUpdated
+          # Rendered into app.ini by an init container on every start, so settings live here
+          # rather than in the volume.
+          config:
+            server:
+              DOMAIN: gitea.localhost
+              ROOT_URL: https://gitea.localhost/
+              # Gitea's default, but the chart reads it for the gitea-http Service targetPort
+              # and renders an empty (null) one when it is not set explicitly.
+              HTTP_PORT: 3000
+              # Clone over HTTPS only: SSH would need another host port in kind-config.yaml.
+              # The chart still creates the headless gitea-ssh Service, with nothing behind it.
+              DISABLE_SSH: true
+              START_SSH_SERVER: false
+            database:
+              DB_TYPE: sqlite3
+            session:
+              PROVIDER: db
+            cache:
+              ADAPTER: memory
+            queue:
+              TYPE: level
+            # Users are created by the admin, there is no public sign-up.
+            service:
+              DISABLE_REGISTRATION: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
