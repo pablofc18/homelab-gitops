@@ -31,6 +31,11 @@ spec:
               # label (serviceMonitorSelectorNilUsesHelmValues). Without it, nothing is scraped.
               additionalLabels:
                 release: kube-prometheus-stack
+              # Traefik's own "service" label names the backend (e.g. vaultwarden-...@kubernetes),
+              # but Prometheus also attaches the scraped Service (traefik-metrics) as "service" and,
+              # by default, renames Traefik's to exported_service. Keep Traefik's labels instead;
+              # it emits no job/instance labels that could override the scrape ones.
+              honorLabels: true
         ports:
           web:
             hostPort: 80
