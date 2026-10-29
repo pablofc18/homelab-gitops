@@ -14,6 +14,23 @@ spec:
         service:
           spec:
             type: ClusterIP
+        # Traefik sees every request to every app, so its per-service request counts, status
+        # codes and latency histograms are the SLIs for Vaultwarden, Gitea, Grafana... The
+        # metrics entrypoint (:9100) stays internal: a dedicated ClusterIP Service for it, and a
+        # ServiceMonitor that tells the Prometheus Operator to scrape it.
+        metrics:
+          prometheus:
+            service:
+              enabled: true
+            # Render the ServiceMonitor even when helm template cannot see the CRD (CI, first
+            # sync of a fresh cluster); SkipDryRunOnMissingResource covers the CRD ordering.
+            disableAPICheck: true
+            serviceMonitor:
+              enabled: true
+              # kube-prometheus-stack's Prometheus only selects ServiceMonitors carrying this
+              # label (serviceMonitorSelectorNilUsesHelmValues). Without it, nothing is scraped.
+              additionalLabels:
+                release: kube-prometheus-stack
         ports:
           web:
             hostPort: 80
@@ -58,3 +75,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # The ServiceMonitor uses the Prometheus Operator CRD from kube-prometheus-stack.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
