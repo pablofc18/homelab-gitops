@@ -1,0 +1,88 @@
+# Availability SLO for every service behind Traefik: 99% of requests answered without a 5xx,
+# over 30 days. The error budget is the remaining 1%; 4xx are client errors and do not spend it.
+#
+# Multi-window, multi-burn-rate alerts (Google SRE Workbook, chapter 5): a burn rate of N spends
+# the 30-day budget N times too fast (14.4 = 2% of the budget in 1 hour). Each alert needs a long
+# window (the problem is real, not a blip) and a short one (it stops firing soon after recovery).
+#
+# Lab caveats: with very little traffic one 5xx can be a large share of requests and fire the
+# fast-burn alert, and Prometheus has no persistent volume, so a restart empties the windows.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-availability
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack's Prometheus only loads rules with this label (ruleSelector).
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # Error ratio per service, precomputed for each window the alerts use. Without traffic the
+    # ratio is NaN (0/0), which never fires; "or ... * 0" gives 0 while there are no errors.
+    - name: slo-availability.rules
+      rules:
+        - record: service:traefik_service_errors:ratio_rate5m
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[5m])) or sum by (service) (rate(traefik_service_requests_total[5m])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[5m]))
+        - record: service:traefik_service_errors:ratio_rate30m
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[30m])) or sum by (service) (rate(traefik_service_requests_total[30m])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[30m]))
+        - record: service:traefik_service_errors:ratio_rate1h
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[1h])) or sum by (service) (rate(traefik_service_requests_total[1h])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[1h]))
+        - record: service:traefik_service_errors:ratio_rate2h
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[2h])) or sum by (service) (rate(traefik_service_requests_total[2h])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[2h]))
+        - record: service:traefik_service_errors:ratio_rate6h
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[6h])) or sum by (service) (rate(traefik_service_requests_total[6h])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[6h]))
+        - record: service:traefik_service_errors:ratio_rate1d
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[1d])) or sum by (service) (rate(traefik_service_requests_total[1d])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[1d]))
+        - record: service:traefik_service_errors:ratio_rate3d
+          expr: |
+            (sum by (service) (rate(traefik_service_requests_total{code=~"5.."}[3d])) or sum by (service) (rate(traefik_service_requests_total[3d])) * 0)
+            / sum by (service) (rate(traefik_service_requests_total[3d]))
+    # 0.01 is the error budget (1 - 0.99).
+    - name: slo-availability.alerts
+      rules:
+        - alert: ServiceErrorBudgetFastBurn
+          expr: |
+            (
+              service:traefik_service_errors:ratio_rate1h > (14.4 * 0.01)
+              and service:traefik_service_errors:ratio_rate5m > (14.4 * 0.01)
+            )
+            or
+            (
+              service:traefik_service_errors:ratio_rate6h > (6 * 0.01)
+              and service:traefik_service_errors:ratio_rate30m > (6 * 0.01)
+            )
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.service }} is burning its error budget fast"
+            description: "{{ $labels.service }} answers {{ $value | humanizePercentage }} of requests with a 5xx. At this rate the 30-day error budget (1%) runs out within days."
+        - alert: ServiceErrorBudgetSlowBurn
+          expr: |
+            (
+              service:traefik_service_errors:ratio_rate1d > (3 * 0.01)
+              and service:traefik_service_errors:ratio_rate2h > (3 * 0.01)
+            )
+            or
+            (
+              service:traefik_service_errors:ratio_rate3d > (1 * 0.01)
+              and service:traefik_service_errors:ratio_rate6h > (1 * 0.01)
+            )
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.service }} is steadily burning its error budget"
+            description: "{{ $labels.service }} answers {{ $value | humanizePercentage }} of requests with a 5xx, enough to exhaust the 30-day error budget (1%) before the month ends."
