@@ -4,7 +4,7 @@ ARGOCD_VERSION := v3.5.6
 # age private key used by sops-secrets-operator to decrypt SopsSecrets. Never commit it.
 SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 
-.PHONY: up destroy status argocd-ui argocd-password sops-key lint validate scan
+.PHONY: up destroy status argocd-ui argocd-password sops-key lint validate scan test-rules
 
 up:
 	kind create cluster --name $(CLUSTER_NAME) --config bootstrap/kind-config.yaml
@@ -46,3 +46,6 @@ validate:
 scan:
 	RENDER_DIR=.rendered ./scripts/validate-manifests.sh
 	trivy config --skip-version-check --exit-code 1 --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml .rendered/manifests
+
+test-rules:
+	./scripts/test-prometheus-rules.sh

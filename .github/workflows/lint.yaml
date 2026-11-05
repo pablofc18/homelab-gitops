@@ -46,3 +46,14 @@ jobs:
         run: >-
           trivy config --skip-version-check --exit-code 1 --severity HIGH,CRITICAL
           --ignorefile .trivyignore.yaml .rendered/manifests
+
+  promtool:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install tools
+        run: ./scripts/ci-install-tools.sh yq promtool
+
+      - name: Check and unit test Prometheus rules
+        run: ./scripts/test-prometheus-rules.sh

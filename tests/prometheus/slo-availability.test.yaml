@@ -1,0 +1,191 @@
+# Unit tests for manifests/monitoring/slo-availability.yaml. Run with `make test-rules`.
+rule_files:
+  - ../../.rendered/prometheus-rules/slo-availability.yaml
+
+evaluation_interval: 1m
+
+# Without an order promtool evaluates the groups in random order, so an alert would sometimes read
+# the previous minute's ratio and the percentages in its annotations would change between runs.
+group_eval_order:
+  - slo-availability.rules
+  - slo-availability.alerts
+
+tests:
+  - interval: 1m
+    input_series:
+      # broken: 20% of requests answered with a 5xx, all the time.
+      - series: 'traefik_service_requests_total{code="200", service="broken"}'
+        values: '0+80x150'
+      - series: 'traefik_service_requests_total{code="500", service="broken"}'
+        values: '0+20x150'
+      # recovers: 20% 5xx for 90 minutes, then no more errors.
+      - series: 'traefik_service_requests_total{code="200", service="recovers"}'
+        values: '0+80x90 7300+100x59'
+      - series: 'traefik_service_requests_total{code="500", service="recovers"}'
+        values: '0+20x90 1800+0x59'
+      # leak: 4% 5xx, above the slow-burn thresholds (3 and 1 x 1%) but below the fast ones (14.4 and 6 x 1%).
+      - series: 'traefik_service_requests_total{code="200", service="leak"}'
+        values: '0+96x150'
+      - series: 'traefik_service_requests_total{code="503", service="leak"}'
+        values: '0+4x150'
+      # client-errors: 4xx are the client's fault and must not spend the budget.
+      - series: 'traefik_service_requests_total{code="200", service="client-errors"}'
+        values: '0+80x150'
+      - series: 'traefik_service_requests_total{code="404", service="client-errors"}'
+        values: '0+20x150'
+      # idle: the series exists but there is no traffic, so the ratio is NaN.
+      - series: 'traefik_service_requests_total{code="200", service="idle"}'
+        values: '5+0x150'
+
+    promql_expr_test:
+      # With no 5xx series at all, "or ... * 0" still gives a ratio of 0 instead of no data.
+      - expr: service:traefik_service_errors:ratio_rate5m{service=~"broken|client-errors"}
+        eval_time: 90m
+        exp_samples:
+          - labels: 'service:traefik_service_errors:ratio_rate5m{service="broken"}'
+            value: 0.2
+          - labels: 'service:traefik_service_errors:ratio_rate5m{service="client-errors"}'
+            value: 0
+
+    alert_rule_test:
+      # The "for" clause holds the alert back: nothing fires right away.
+      - eval_time: 1m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts: []
+      # Fast burn is past its 2 minutes at 10m, slow burn is still within its 15.
+      - eval_time: 10m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: {severity: critical, service: broken}
+            exp_annotations:
+              summary: "broken is burning its error budget fast"
+              description: "broken answers 20% of requests with a 5xx. At this rate the 30-day error budget (1%) runs out within days."
+          - exp_labels: {severity: critical, service: recovers}
+            exp_annotations:
+              summary: "recovers is burning its error budget fast"
+              description: "recovers answers 20% of requests with a 5xx. At this rate the 30-day error budget (1%) runs out within days."
+      - eval_time: 10m
+        alertname: ServiceErrorBudgetSlowBurn
+        exp_alerts: []
+      # 4% errors is a slow burn only. client-errors and idle never fire.
+      - eval_time: 90m
+        alertname: ServiceErrorBudgetSlowBurn
+        exp_alerts:
+          - exp_labels: {severity: warning, service: broken}
+            exp_annotations:
+              summary: "broken is steadily burning its error budget"
+              description: "broken answers 20% of requests with a 5xx, enough to exhaust the 30-day error budget (1%) before the month ends."
+          - exp_labels: {severity: warning, service: leak}
+            exp_annotations:
+              summary: "leak is steadily burning its error budget"
+              description: "leak answers 4% of requests with a 5xx, enough to exhaust the 30-day error budget (1%) before the month ends."
+          - exp_labels: {severity: warning, service: recovers}
+            exp_annotations:
+              summary: "recovers is steadily burning its error budget"
+              description: "recovers answers 20% of requests with a 5xx, enough to exhaust the 30-day error budget (1%) before the month ends."
+      # 40 minutes after recovering, the 30m window clears branch B although the 6h one still sees
+      # the problem. Without the short window it would keep firing.
+      - eval_time: 130m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: {severity: critical, service: broken}
+            exp_annotations:
+              summary: "broken is burning its error budget fast"
+              description: "broken answers 20% of requests with a 5xx. At this rate the 30-day error budget (1%) runs out within days."
+
+  # The slow burn also clears on its short windows: at 450m the 2h and 6h ones are clean, while the
+  # 1d and 3d ones still hold the 90 bad minutes. On its own because a series that ended recently
+  # stays inside the 6h window and would keep firing.
+  - interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{code="200", service="recovers"}'
+        values: '0+80x90 7300+100x359'
+      - series: 'traefik_service_requests_total{code="500", service="recovers"}'
+        values: '0+20x90 1800+0x359'
+    alert_rule_test:
+      - eval_time: 450m
+        alertname: ServiceErrorBudgetSlowBurn
+        exp_alerts: []
+
+  # Each alert is "branch A or branch B", and a constantly failing service fires both, which would
+  # hide a broken branch. These scenarios fire exactly one, or none.
+  - interval: 1m
+    input_series:
+      # steady10: 10% errors is under fast-burn branch A (14.4%), over branch B (6%).
+      - series: 'traefik_service_requests_total{code="200", service="steady10"}'
+        values: '0+90x60'
+      - series: 'traefik_service_requests_total{code="500", service="steady10"}'
+        values: '0+10x60'
+      # blip: every request fails for 2 minutes. The short windows see it, the long ones do not care.
+      - series: 'traefik_service_requests_total{code="200", service="blip"}'
+        values: '0+100x50 5000+0x1 5100+100x9'
+      - series: 'traefik_service_requests_total{code="500", service="blip"}'
+        values: '0+0x50 100+100x1 200+0x9'
+      # burst: 6 clean hours, every request failing for 15 minutes, then clean again. Branch A only,
+      # as the 6h window stays under 6%: not yet at 8 minutes (1h window at 14%), firing at 15 (25%),
+      # and cleared by the 5m window 10 minutes later although the 1h window is still at 25%. The 5xx
+      # counter starts above 0 because rate() does not extrapolate a counter back past zero, which
+      # would skew the ratio against the 200s.
+      - series: 'traefik_service_requests_total{code="200", service="burst"}'
+        values: '0+100x360 36000+0x14 36100+100x14'
+      - series: 'traefik_service_requests_total{code="500", service="burst"}'
+        values: '50+0x360 150+100x14 1550+0x14'
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: {severity: critical, service: steady10}
+            exp_annotations:
+              summary: "steady10 is burning its error budget fast"
+              description: "steady10 answers 10% of requests with a 5xx. At this rate the 30-day error budget (1%) runs out within days."
+      - eval_time: 368m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts: []
+      - eval_time: 385m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts: []
+      - eval_time: 375m
+        alertname: ServiceErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: {severity: critical, service: burst}
+            exp_annotations:
+              summary: "burst is burning its error budget fast"
+              description: "burst answers 25.42% of requests with a 5xx. At this rate the 30-day error budget (1%) runs out within days."
+
+  # Three days of data at one sample every 5 minutes, enough for the 3d window.
+  - interval: 5m
+    input_series:
+      # lastday: heavy clean traffic for 2 days, then light traffic with 4% errors. Slow-burn branch
+      # A only: 4% over 1d and 2h, but the 3d window is under 1%.
+      - series: 'traefik_service_requests_total{code="200", service="lastday"}'
+        values: '0+5000x576 2880480+480x287'
+      - series: 'traefik_service_requests_total{code="500", service="lastday"}'
+        values: '0+0x576 20+20x287'
+      # lastday2: same with 2% errors, under both branches: the 1d window is below 3%, the 3d one below 1%.
+      - series: 'traefik_service_requests_total{code="200", service="lastday2"}'
+        values: '0+5000x576 2880490+490x287'
+      - series: 'traefik_service_requests_total{code="500", service="lastday2"}'
+        values: '0+0x576 10+10x287'
+      # steady2: 2% errors is under branch A (3%), over branch B (1%).
+      - series: 'traefik_service_requests_total{code="200", service="steady2"}'
+        values: '0+98x864'
+      - series: 'traefik_service_requests_total{code="500", service="steady2"}'
+        values: '0+2x864'
+      # recent: 8% errors for the last 90 minutes. The short windows (2h, 6h) are over their
+      # thresholds, the long ones (1d, 3d) are not, so it must not fire yet.
+      - series: 'traefik_service_requests_total{code="200", service="recent"}'
+        values: '0+5000x846 4234600+4600x17'
+      - series: 'traefik_service_requests_total{code="500", service="recent"}'
+        values: '0+0x846 400+400x17'
+    alert_rule_test:
+      - eval_time: 72h
+        alertname: ServiceErrorBudgetSlowBurn
+        exp_alerts:
+          - exp_labels: {severity: warning, service: lastday}
+            exp_annotations:
+              summary: "lastday is steadily burning its error budget"
+              description: "lastday answers 4% of requests with a 5xx, enough to exhaust the 30-day error budget (1%) before the month ends."
+          - exp_labels: {severity: warning, service: steady2}
+            exp_annotations:
+              summary: "steady2 is steadily burning its error budget"
+              description: "steady2 answers 2% of requests with a 5xx, enough to exhaust the 30-day error budget (1%) before the month ends."

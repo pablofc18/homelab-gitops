@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install pinned CLI tools for CI into $HOME/bin and add it to the job PATH.
-# Usage: ci-install-tools.sh helm yq kubeconform trivy
+# Usage: ci-install-tools.sh helm yq kubeconform trivy promtool
 set -euo pipefail
 
 # Versions are bumped by Renovate via the "# renovate:" annotations (see renovate.json).
@@ -12,6 +12,8 @@ YQ_VERSION=v4.54.1
 KUBECONFORM_VERSION=v0.8.0
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.+)$
 TRIVY_VERSION=0.76.1
+# renovate: datasource=github-releases depName=prometheus/prometheus extractVersion=^v(?<version>.+)$
+PROMTOOL_VERSION=3.15.1
 
 bin="$HOME/bin"
 mkdir -p "$bin"
@@ -42,6 +44,14 @@ for tool in "$@"; do
       curl -sSL -o "$tmp/checksums.txt" "$base/trivy_${TRIVY_VERSION}_checksums.txt"
       (cd "$tmp" && grep " ${archive}\$" checksums.txt | sha256sum -c -)
       tar xzf "$tmp/$archive" -C "$bin" trivy
+      ;;
+    promtool)
+      archive="prometheus-${PROMTOOL_VERSION}.linux-amd64.tar.gz"
+      base="https://github.com/prometheus/prometheus/releases/download/v${PROMTOOL_VERSION}"
+      curl -sSL -o "$tmp/$archive" "$base/$archive"
+      curl -sSL -o "$tmp/sha256sums.txt" "$base/sha256sums.txt"
+      (cd "$tmp" && grep " ${archive}\$" sha256sums.txt | sha256sum -c -)
+      tar xzf "$tmp/$archive" -C "$bin" --strip-components=1 "prometheus-${PROMTOOL_VERSION}.linux-amd64/promtool"
       ;;
     *)
       echo "unknown tool: $tool" >&2
