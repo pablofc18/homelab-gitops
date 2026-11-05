@@ -215,6 +215,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
  
 - kind clusters are meant for development, not for staying up across reboots. After a reboot the node containers may need to be started again, or the cluster recreated with `make destroy && make up`.
 - Vaultwarden and Gitea data live on kind's local-path storage: a directory inside one node container, deleted with the PVC or by `make destroy`, and with no backups yet. Do not store real passwords or repositories in them until backups are in place.
+- SLO alerts have no Alertmanager receiver, so they only show up in Grafana (*Alerting* → *Alert rules*) and nobody gets notified. Prometheus has no persistent volume either, so recreating its pod empties the SLO windows.
 
 ## Roadmap
  
@@ -232,7 +233,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] Vaultwarden at `https://vaultwarden.localhost`: StatefulSet + PVC, admin token from SOPS
 - [x] Gitea at `https://gitea.localhost`: Helm chart with SQLite, admin credentials from SOPS
 - [ ] Backups for stateful apps (postponed)
-- [ ] Observability: dashboards, alerts and SLOs
+- [x] Observability: Traefik metrics, Grafana dashboard, availability and latency SLOs with burn-rate alerts
 
 ## What I'm learning
 

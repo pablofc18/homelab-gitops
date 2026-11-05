@@ -80,7 +80,7 @@ data:
           "id": 3,
           "type": "timeseries",
           "title": "Latency p95",
-          "description": "95th percentile of request duration. Traefik's default histogram buckets are 0.1, 0.3, 1.2 and 5 s, and histogram_quantile interpolates inside a bucket: a value like 0.095 s means 'under 100 ms', not exactly 95 ms.",
+          "description": "95th percentile of HTTP request duration. Websockets and SSE are left out because Traefik records their whole connection as one request. Traefik's default histogram buckets are 0.1, 0.3, 1.2 and 5 s, and histogram_quantile interpolates inside a bucket: a value like 0.095 s means 'under 100 ms', not exactly 95 ms.",
           "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
@@ -88,7 +88,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "histogram_quantile(0.95, sum by (service, le) (rate(traefik_service_request_duration_seconds_bucket{service=~\"$service\"}[$__rate_interval])))",
+              "expr": "histogram_quantile(0.95, sum by (service, le) (rate(traefik_service_request_duration_seconds_bucket{service=~\"$service\", protocol=\"http\"}[$__rate_interval])))",
               "legendFormat": "{{service}}"
             }
           ]

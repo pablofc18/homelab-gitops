@@ -1,0 +1,88 @@
+# Latency SLO for every service behind Traefik: 99% of HTTP requests answered within 300 ms, over
+# 30 days. The threshold has to be a histogram bucket boundary (Traefik's defaults are 0.1, 0.3,
+# 1.2 and 5 s) so that "fast enough" is counted exactly, not interpolated. Starting value: the few
+# requests seen so far all took under 100 ms, so retune it once there is real traffic.
+#
+# protocol="http" leaves out websocket and SSE requests: Traefik records their duration as the
+# whole connection, so a Grafana tab left open for an hour would count as one very slow request.
+#
+# Same multi-window, multi-burn-rate alerts and lab caveats as slo-availability.yaml.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-latency
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack's Prometheus only loads rules with this label (ruleSelector).
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # Share of HTTP requests slower than 300 ms per service, precomputed for each window the alerts
+    # use. Without traffic the ratio is NaN (0/0), which never fires.
+    - name: slo-latency.rules
+      rules:
+        - record: service:traefik_service_slow_requests:ratio_rate5m
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[5m]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[5m]))
+        - record: service:traefik_service_slow_requests:ratio_rate30m
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[30m]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[30m]))
+        - record: service:traefik_service_slow_requests:ratio_rate1h
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[1h]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[1h]))
+        - record: service:traefik_service_slow_requests:ratio_rate2h
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[2h]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[2h]))
+        - record: service:traefik_service_slow_requests:ratio_rate6h
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[6h]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[6h]))
+        - record: service:traefik_service_slow_requests:ratio_rate1d
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[1d]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[1d]))
+        - record: service:traefik_service_slow_requests:ratio_rate3d
+          expr: |
+            1 - sum by (service) (rate(traefik_service_request_duration_seconds_bucket{protocol="http", le="0.3"}[3d]))
+            / sum by (service) (rate(traefik_service_request_duration_seconds_count{protocol="http"}[3d]))
+    # 0.01 is the error budget (1 - 0.99).
+    - name: slo-latency.alerts
+      rules:
+        - alert: ServiceLatencyBudgetFastBurn
+          expr: |
+            (
+              service:traefik_service_slow_requests:ratio_rate1h > (14.4 * 0.01)
+              and service:traefik_service_slow_requests:ratio_rate5m > (14.4 * 0.01)
+            )
+            or
+            (
+              service:traefik_service_slow_requests:ratio_rate6h > (6 * 0.01)
+              and service:traefik_service_slow_requests:ratio_rate30m > (6 * 0.01)
+            )
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.service }} is burning its latency budget fast"
+            description: "{{ $value | humanizePercentage }} of HTTP requests to {{ $labels.service }} take over 300 ms. At this rate the 30-day latency budget (1%) runs out within days."
+        - alert: ServiceLatencyBudgetSlowBurn
+          expr: |
+            (
+              service:traefik_service_slow_requests:ratio_rate1d > (3 * 0.01)
+              and service:traefik_service_slow_requests:ratio_rate2h > (3 * 0.01)
+            )
+            or
+            (
+              service:traefik_service_slow_requests:ratio_rate3d > (1 * 0.01)
+              and service:traefik_service_slow_requests:ratio_rate6h > (1 * 0.01)
+            )
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.service }} is steadily burning its latency budget"
+            description: "{{ $value | humanizePercentage }} of HTTP requests to {{ $labels.service }} take over 300 ms, enough to exhaust the 30-day latency budget (1%) before the month ends."
