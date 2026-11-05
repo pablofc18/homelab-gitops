@@ -28,6 +28,7 @@ Because the goal is learning, **explaining matters as much as the result**:
 | `bootstrap/root-app.yaml` | ArgoCD `root` Application (app-of-apps), watches `apps/` on `main`. Applied once by `make up`. |
 | `apps/` | **One ArgoCD `Application` per file**, each is picked up automatically by `root`. |
 | `manifests/<app>/` | Raw manifests / extra values referenced by an app in `apps/`. |
+| `tests/prometheus/` | `promtool` unit tests for the `PrometheusRule`s in `manifests/`. Not deployed. |
 | `docs/architecture.md` | Detailed design, flows, trade-offs. |
 | `Makefile` | `up`, `destroy`, `status`, `argocd-ui`, `argocd-password`. |
 
@@ -85,20 +86,22 @@ Read-only inspection is always fine (`kubectl get/describe/logs`, `argocd app ge
 
 ## Validating changes (before pushing)
 
-CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; all three jobs are required checks on `main` (ruleset `protect_main`, branches must be up to date before merging):
+CI (`.github/workflows/lint.yaml`) runs on every PR and push to `main`; all four jobs are required checks on `main` (ruleset `protect_main`, branches must be up to date before merging):
 
 - `yamllint`: `yamllint --strict` with the rules in `.yamllint`.
 - `kubeconform`: `scripts/validate-manifests.sh` first fails on any unencrypted `manifests/**/*.sops.yaml`, then validates the Applications against the ArgoCD CRD schema, renders every Helm-based app with `helm template` (same chart, version and inline values ArgoCD uses), bundles every `path` app from `manifests/` into one file, and validates the output with `kubeconform -strict`. Custom resources are validated with schemas from the datreeio CRDs-catalog. CRD definitions are skipped (no upstream schema).
 - `trivy`: scans the same rendered manifests with `trivy config` and fails on HIGH/CRITICAL findings. Accepted risks live in `.trivyignore.yaml`, each scoped to one app's rendered file and with a `statement` explaining why. Never add an ignore without that justification; prefer fixing the values.
+- `promtool`: `scripts/test-prometheus-rules.sh` extracts every `PrometheusRule` in `manifests/`, runs `promtool check rules` and the unit tests in `tests/prometheus/*.test.yaml`, which feed simulated series to the rules and assert which alerts fire. A new or changed rule needs a test there, not in `manifests/` (ArgoCD would try to apply it).
 
 Tool versions for CI are pinned in `scripts/ci-install-tools.sh` (Trivy is installed as a checksum-verified binary, not via a third-party action).
 
-Run the same checks locally before pushing (needs `helm`, `yq` v4, `kubeconform`, `trivy`):
+Run the same checks locally before pushing (needs `helm`, `yq` v4, `kubeconform`, `trivy`, `promtool`):
 
 ```bash
 make lint       # or: uvx yamllint@1.37.1 --strict .
 make validate
 make scan
+make test-rules
 ```
 
 If you add an app whose source type the script does not handle, extend the script so it stays covered.

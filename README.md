@@ -63,6 +63,7 @@ homelab-gitops/
 │   ├── vaultwarden.yaml
 │   └── whoami.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
+├── tests/prometheus/        # Unit tests for the Prometheus rules (promtool)
 ├── docs/                    # Extra documentation
 ├── Makefile
 ├── renovate.json            # Automated dependency update PRs
@@ -202,6 +203,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 | `make lint` | Run `yamllint` on the repo |
 | `make validate` | Render all apps and validate them with `kubeconform` |
 | `make scan` | Render all apps and scan them with Trivy (fails on HIGH/CRITICAL) |
+| `make test-rules` | Check the Prometheus rules and run their unit tests with `promtool` |
  
 ## Design decisions
  
@@ -223,7 +225,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] ArgoCD with app-of-apps bootstrap
 - [x] Traefik ingress controller
 - [x] Pin all chart versions
-- [x] CI: `yamllint`, `kubeconform` and Trivy on pull requests
+- [x] CI: `yamllint`, `kubeconform`, Trivy and `promtool` rule tests on pull requests
 - [x] Renovate for automated dependency updates
 - [x] cert-manager (TLS) with a local CA
 - [x] kube-prometheus-stack: Prometheus, Alertmanager, node-exporter, kube-state-metrics
