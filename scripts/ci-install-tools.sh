@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install pinned CLI tools for CI into $HOME/bin and add it to the job PATH.
-# Usage: ci-install-tools.sh helm yq kubeconform trivy promtool
+# Usage: ci-install-tools.sh helm yq kustomize kubeconform trivy promtool
 set -euo pipefail
 
 # Versions are bumped by Renovate via the "# renovate:" annotations (see renovate.json).
@@ -8,6 +8,8 @@ set -euo pipefail
 HELM_VERSION=v4.3.1
 # renovate: datasource=github-releases depName=mikefarah/yq
 YQ_VERSION=v4.54.1
+# renovate: datasource=github-releases depName=kubernetes-sigs/kustomize extractVersion=^kustomize/(?<version>.+)$
+KUSTOMIZE_VERSION=v5.8.3
 # renovate: datasource=github-releases depName=yannh/kubeconform
 KUBECONFORM_VERSION=v0.8.0
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.+)$
@@ -30,6 +32,14 @@ for tool in "$@"; do
       curl -sSL -o "$bin/yq" \
         "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
       chmod +x "$bin/yq"
+      ;;
+    kustomize)
+      archive="kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+      base="https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}"
+      curl -sSL -o "$tmp/$archive" "$base/$archive"
+      curl -sSL -o "$tmp/checksums.txt" "$base/checksums.txt"
+      (cd "$tmp" && grep " ${archive}\$" checksums.txt | sha256sum -c -)
+      tar xzf "$tmp/$archive" -C "$bin" kustomize
       ;;
     kubeconform)
       curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \

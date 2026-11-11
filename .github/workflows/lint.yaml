@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install tools
-        run: ./scripts/ci-install-tools.sh helm yq kubeconform
+        run: ./scripts/ci-install-tools.sh helm yq kustomize kubeconform
 
       - name: Render and validate manifests
         run: ./scripts/validate-manifests.sh
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install tools
-        run: ./scripts/ci-install-tools.sh helm yq kubeconform trivy
+        run: ./scripts/ci-install-tools.sh helm yq kustomize kubeconform trivy
 
       - name: Render manifests
         run: RENDER_DIR=.rendered ./scripts/validate-manifests.sh

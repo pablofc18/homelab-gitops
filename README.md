@@ -27,7 +27,7 @@ flowchart LR
  
 **How it works**
  
-1. `make up` creates the kind cluster, installs ArgoCD and applies the `root` Application.
+1. `make up` creates the kind cluster, installs ArgoCD and applies the `root` Application. From then on ArgoCD manages itself too (`apps/argocd.yaml`), so upgrading it is a commit like any other.
 2. `root` watches the `apps/` folder of this repo. Every YAML in it is itself an ArgoCD `Application`.
 3. ArgoCD keeps the cluster in sync with Git (`automated`, `prune`, `selfHeal`). Manual changes in the cluster are reverted.
 4. Adding a new service = adding a YAML in `apps/`, commit and push.
@@ -52,6 +52,7 @@ homelab-gitops/
 │   ├── kind-config.yaml     # Cluster definition (nodes, port mappings, labels)
 │   └── root-app.yaml        # ArgoCD root Application (app-of-apps)
 ├── apps/                    # One ArgoCD Application per service (watched by root)
+│   ├── argocd.yaml          # ArgoCD itself (self-managed)
 │   ├── cert-manager.yaml
 │   ├── cert-manager-issuers.yaml
 │   ├── gitea.yaml
@@ -222,7 +223,7 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 ## Roadmap
  
 - [x] kind cluster with 3 nodes
-- [x] ArgoCD with app-of-apps bootstrap
+- [x] ArgoCD with app-of-apps bootstrap, managing itself from Git
 - [x] Traefik ingress controller
 - [x] Pin all chart versions
 - [x] CI: `yamllint`, `kubeconform`, Trivy and `promtool` rule tests on pull requests

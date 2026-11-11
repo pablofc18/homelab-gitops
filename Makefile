@@ -1,6 +1,4 @@
 CLUSTER_NAME := homelab
-# renovate: datasource=github-releases depName=argoproj/argo-cd
-ARGOCD_VERSION := v3.5.6
 # age private key used by sops-secrets-operator to decrypt SopsSecrets. Never commit it.
 SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 
@@ -9,7 +7,8 @@ SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 up:
 	kind create cluster --name $(CLUSTER_NAME) --config bootstrap/kind-config.yaml
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
+	# Same manifests that apps/argocd.yaml keeps in sync afterwards (ArgoCD manages itself).
+	kubectl apply --server-side -k manifests/argocd
 	kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s
 	$(MAKE) sops-key
 	kubectl apply -f bootstrap/root-app.yaml
