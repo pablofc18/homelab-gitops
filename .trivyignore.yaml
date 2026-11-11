@@ -78,3 +78,24 @@ misconfigurations:
       The chart's ClusterRole uses the "*" verb on secrets, configmaps, events and leases and
       only offers rbac.enabled (all or nothing). Replacing it with a hand-written ClusterRole
       would mean maintaining a copy of upstream RBAC; accepted for a single-user lab.
+  - id: KSV-0044
+    paths:
+      - argocd.yaml
+    statement: >-
+      The application-controller deploys whatever apps/ declares (CRDs, ClusterRoles, Secrets in
+      any namespace), so upstream gives it every verb on every resource. Restricting it would mean
+      maintaining an allow-list of every kind any app ships. AppProjects are the place to limit
+      what an Application may deploy, not the controller's RBAC.
+  - id: KSV-0046
+    paths:
+      - argocd.yaml
+    statement: >-
+      Same as KSV-0044 for the application-controller. argocd-server also needs get/patch/delete
+      on all resources for the UI's resource view, actions and deletions; it is only reachable
+      through a local port-forward.
+  - id: KSV-0041
+    paths:
+      - argocd.yaml
+    statement: >-
+      The ApplicationSet controller reads Secrets cluster-wide for cluster and SCM generator
+      credentials (read-only: get/list/watch). Not used yet, and upstream's RBAC has no switch.

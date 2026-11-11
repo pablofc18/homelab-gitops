@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  # No resources-finalizer on purpose: deleting this Application (or its file) must orphan
+  # ArgoCD, not uninstall the controller that is running the deletion.
+spec:
+  project: default
+  # ArgoCD manages itself: `make up` installs it once from manifests/argocd, and from then on
+  # this app keeps it in sync, so a version bump in Git upgrades the running ArgoCD.
+  source:
+    repoURL: https://github.com/pablofc18/homelab-gitops.git
+    path: manifests/argocd
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # The ApplicationSet CRD is too big for the last-applied-configuration annotation of a
+      # client-side apply, and `make up` installs with server-side apply too.
+      - ServerSideApply=true

@@ -34,7 +34,7 @@ flowchart TB
 |---|---|---|
 | Host | Docker, Linux | Manual (my workstation) |
 | Kubernetes | kind cluster (3 nodes as containers) | `make up` / `bootstrap/kind-config.yaml` |
-| Platform | ArgoCD, Traefik | ArgoCD itself (Traefik) and bootstrap (ArgoCD) |
+| Platform | ArgoCD, Traefik | ArgoCD, including ArgoCD itself after the bootstrap install |
 | Applications | whoami (smoke test), Vaultwarden, Gitea | ArgoCD, from `apps/` |
 
 ## 3. Cluster topology
@@ -66,7 +66,7 @@ sequenceDiagram
     Me->>Kind: create cluster (bootstrap/kind-config.yaml)
     Kind-->>K8s: 3 nodes ready
     Me->>K8s: create namespace argocd
-    Me->>K8s: apply ArgoCD install manifest
+    Me->>K8s: apply ArgoCD (kustomize build manifests/argocd)
     Me->>K8s: wait for argocd-server available
     Me->>K8s: apply bootstrap/root-app.yaml
     K8s-->>Argo: root Application created
@@ -75,7 +75,7 @@ sequenceDiagram
     Argo->>K8s: sync each app (e.g. Traefik via Helm)
 ```
 
-Only two things are applied by hand: the ArgoCD install and `root-app.yaml`. Everything else comes from Git.
+Only two things are applied by hand: the ArgoCD install and `root-app.yaml`. Everything else comes from Git, and even the ArgoCD install is only applied by hand once: `make up` builds it from the same `manifests/argocd/` that `apps/argocd.yaml` then keeps in sync, so ArgoCD manages itself from the first sync on.
 
 ## 5. App-of-apps pattern
 
@@ -175,6 +175,7 @@ flowchart LR
 | `bootstrap/kind-config.yaml` | Cluster definition for the `kind` tool | `make up` (manual, once) |
 | `bootstrap/root-app.yaml` | Entry point of GitOps | `make up` (manual, once) |
 | `apps/` | ArgoCD Applications, one per service | ArgoCD (via `root`) |
+| `manifests/argocd/` | ArgoCD's own installation (kustomization) | `make up` once, then ArgoCD (`apps/argocd.yaml`) |
 | `manifests/` | Raw manifests and values used by apps | ArgoCD |
 | `docs/` | Documentation | n/a |
 
@@ -195,8 +196,9 @@ flowchart LR
 | Grafana with a namespaced Role, sidecars watching only `monitoring` | Chart default: sidecars search all namespaces | The default ClusterRole grants list/watch on every Secret in the cluster (the chart cannot split ConfigMaps from Secrets). Dashboards have to be ConfigMaps in `monitoring`, which is where they live anyway. |
 | Grafana admin password from a `SopsSecret` (`admin.existingSecret`) | Chart-generated random password | The chart generates it with Helm `lookup`, which ArgoCD's `helm template` cannot run, so the password and the app's sync status would change on every render. |
 | cert-manager for the prometheus-operator webhook certificate | Chart's Helm hook Jobs (`kube-webhook-certgen`) | Hook Jobs are re-run by ArgoCD on every sync. cert-manager is already in the cluster and keeps the certificate renewed. |
-| sops-secrets-operator (decrypt in the cluster) | KSOPS / helm-secrets plugins in ArgoCD's repo-server | Follows ArgoCD's recommendation of destination-cluster secret management: ArgoCD only sees encrypted resources. Needs no changes to the ArgoCD installation, which the Makefile applies from the upstream manifest. |
-| Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`, which is not managed from Git yet. Retrying is simpler and self-healing. |
+| sops-secrets-operator (decrypt in the cluster) | KSOPS / helm-secrets plugins in ArgoCD's repo-server | Follows ArgoCD's recommendation of destination-cluster secret management: ArgoCD only sees encrypted resources. Needs no changes to the ArgoCD installation (a custom repo-server image or plugin sidecar). |
+| ArgoCD manages itself (`apps/argocd.yaml`), from a kustomization over the upstream `install.yaml` | Installed once by `make up` and upgraded by hand; the official Helm chart | Installed by hand, the running version drifted from the pinned one (v3.5.5 running, v3.5.6 in Git) and Renovate bumps never reached the cluster. Self-managed, a merged bump upgrades ArgoCD and `selfHeal` reverts manual edits to it. Kustomize keeps the upstream manifest that `make up` already used, so the bootstrap and the Application render the same objects (switching to the chart would change labels and immutable selectors); settings go in as patches. `ServerSideApply=true` because the ApplicationSet CRD is too large for client-side apply. No resources-finalizer: deleting the Application orphans ArgoCD instead of uninstalling it. |
+| Retry for dependent apps | Sync waves between Applications | Waves on `Application` resources need a custom health check in `argocd-cm`. Retrying is simpler and self-healing. |
 | HTTP → HTTPS redirect on Traefik's `web` entrypoint | `redirectScheme` middleware per Ingress | Secure by default: no app can forget it, and port 80 never serves content. Permanent `308` keeps the method of redirected API calls. |
 | Vaultwarden from plain manifests | Community Helm chart | No official chart, and it is a single container: writing the StatefulSet, PVC and Ingress by hand shows every piece. Renovate already covers images in `manifests/`. |
 | Vaultwarden as a StatefulSet | Deployment with `strategy: Recreate` | `Recreate` only applies to rollouts; when a pod is deleted the ReplicaSet starts a replacement immediately, so two pods briefly share the SQLite volume. The StatefulSet guarantees at most one. |

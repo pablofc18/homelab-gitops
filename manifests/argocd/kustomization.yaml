@@ -1,0 +1,26 @@
+# ArgoCD's own installation. `make up` applies it once to bootstrap the cluster, then
+# apps/argocd.yaml keeps it in sync from Git like any other app (ArgoCD manages itself).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  # Bumped by Renovate (custom manager in renovate.json).
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.6/manifests/install.yaml
+patches:
+  # Upstream sets runAsNonRoot and the seccomp profile on every container but only on some pods.
+  # Setting them on the pod too covers any container a later release adds (Trivy KSV-0118).
+  - target:
+      group: apps
+      kind: (Deployment|StatefulSet)
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: all-workloads
+      spec:
+        template:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault

@@ -2,7 +2,7 @@
 # Render every ArgoCD Application in apps/ the way ArgoCD would and validate
 # the result against Kubernetes (and CRD) JSON schemas with kubeconform.
 #
-# Requires: helm, yq (mikefarah v4), kubeconform.
+# Requires: helm, yq (mikefarah v4), kustomize, kubeconform.
 set -euo pipefail
 
 KUBERNETES_VERSION="${KUBERNETES_VERSION:-1.37.0}"
@@ -76,6 +76,13 @@ for app in apps/*.yaml; do
       --include-crds \
       -f "$values" -f "$workdir/values/$name-object.yaml" > "$rendered"
     validate "$name (chart $chart@$version)" "$rendered"
+
+  elif [[ "${repo%.git}" == "$REPO_URL" && -f "$path/kustomization.yaml" ]]; then
+    # ArgoCD builds a directory with a kustomization.yaml with kustomize instead of reading
+    # the files in it.
+    rendered="$workdir/manifests/$name.yaml"
+    kustomize build "$path" > "$rendered"
+    validate "$name (kustomize $path)" "$rendered"
 
   elif [[ "${repo%.git}" == "$REPO_URL" && -n "$path" ]]; then
     # Bundle the plain manifests into one file per app, like the Helm branch,
