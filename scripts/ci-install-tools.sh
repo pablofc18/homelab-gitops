@@ -15,7 +15,7 @@ KUBECONFORM_VERSION=v0.8.0
 # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.+)$
 TRIVY_VERSION=0.76.2
 # renovate: datasource=github-releases depName=prometheus/prometheus extractVersion=^v(?<version>.+)$
-PROMTOOL_VERSION=3.15.1
+PROMTOOL_VERSION=3.16.0
 
 bin="$HOME/bin"
 mkdir -p "$bin"
