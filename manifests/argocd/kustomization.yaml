@@ -5,7 +5,7 @@ kind: Kustomization
 namespace: argocd
 resources:
   # Bumped by Renovate (custom manager in renovate.json).
-  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.6/manifests/install.yaml
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.6.1/manifests/install.yaml
 patches:
   # Upstream sets runAsNonRoot and the seccomp profile on every container but only on some pods.
   # Setting them on the pod too covers any container a later release adds (Trivy KSV-0118).
