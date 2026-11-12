@@ -7,7 +7,7 @@ set -euo pipefail
 # renovate: datasource=github-releases depName=helm/helm
 HELM_VERSION=v4.3.1
 # renovate: datasource=github-releases depName=mikefarah/yq
-YQ_VERSION=v4.54.1
+YQ_VERSION=v4.54.3
 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize extractVersion=^kustomize/(?<version>.+)$
 KUSTOMIZE_VERSION=v5.8.3
 # renovate: datasource=github-releases depName=yannh/kubeconform
