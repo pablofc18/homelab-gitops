@@ -14,11 +14,14 @@ This document explains how the homelab is built, how its pieces interact and why
 ```mermaid
 flowchart TB
     subgraph L4[Applications layer]
-        APPS[Services deployed via ArgoCD Applications]
+        APPS[whoami - smoke test<br/>Vaultwarden, Gitea - stateful apps]
     end
     subgraph L3[Platform layer]
-        TRAEFIK[Traefik - ingress]
         ARGO[ArgoCD - GitOps controller]
+        TRAEFIK[Traefik - ingress]
+        CERT[cert-manager - TLS, local CA]
+        SOPS[sops-secrets-operator - secrets]
+        MON[kube-prometheus-stack - metrics, alerts, Grafana]
     end
     subgraph L2[Kubernetes layer]
         K8S[kind cluster: 1 control-plane + 2 workers]
@@ -34,7 +37,7 @@ flowchart TB
 |---|---|---|
 | Host | Docker, Linux | Manual (my workstation) |
 | Kubernetes | kind cluster (3 nodes as containers) | `make up` / `bootstrap/kind-config.yaml` |
-| Platform | ArgoCD, Traefik | ArgoCD, including ArgoCD itself after the bootstrap install |
+| Platform | ArgoCD, Traefik, cert-manager, sops-secrets-operator, kube-prometheus-stack | ArgoCD, including ArgoCD itself after the bootstrap install |
 | Applications | whoami (smoke test), Vaultwarden, Gitea | ArgoCD, from `apps/` |
 
 ## 3. Cluster topology
@@ -68,25 +71,47 @@ sequenceDiagram
     Me->>K8s: create namespace argocd
     Me->>K8s: apply ArgoCD (kustomize build manifests/argocd)
     Me->>K8s: wait for argocd-server available
+    Me->>K8s: make sops-key: Secret sops-age-key (age private key from the host)
     Me->>K8s: apply bootstrap/root-app.yaml
     K8s-->>Argo: root Application created
     Argo->>Git: clone repo, read apps/
     Argo->>K8s: create one Application per YAML in apps/
-    Argo->>K8s: sync each app (e.g. Traefik via Helm)
+    Argo->>K8s: sync each app (Helm charts, kustomize, plain manifests)
 ```
 
-Only two things are applied by hand: the ArgoCD install and `root-app.yaml`. Everything else comes from Git, and even the ArgoCD install is only applied by hand once: `make up` builds it from the same `manifests/argocd/` that `apps/argocd.yaml` then keeps in sync, so ArgoCD manages itself from the first sync on.
+Only three things are applied by hand: the ArgoCD install, the age key Secret and `root-app.yaml`. Everything else comes from Git, and even the ArgoCD install is only applied by hand once: `make up` builds it from the same `manifests/argocd/` that `apps/argocd.yaml` then keeps in sync, so ArgoCD manages itself from the first sync on. The age key is the one secret that cannot come from Git, because it is what decrypts the secrets in Git (see [Security considerations](#14-security-considerations)).
 
 ## 5. App-of-apps pattern
 
 ```mermaid
 flowchart TD
     GIT[(Git: apps/ folder)] --> ROOT[Application: root]
-    ROOT --> T[Application: traefik]
-    ROOT --> F1[Application: future app 1]
-    ROOT --> F2[Application: future app 2]
-    T --> TR[Traefik Deployment, Service, ...]
+
+    subgraph HELM[Source: upstream Helm chart]
+        TRAEFIK[traefik]
+        CM[cert-manager]
+        SOPS[sops-secrets-operator]
+        KPS[kube-prometheus-stack]
+        GITEA[gitea]
+    end
+
+    subgraph REPO[Source: path in this repo, manifests/]
+        ARGOCD[argocd<br/>kustomize]
+        ISSUERS[cert-manager-issuers]
+        MON[monitoring]
+        GSEC[gitea-secrets]
+        VW[vaultwarden]
+        WHOAMI[whoami]
+    end
+
+    ROOT --> HELM
+    ROOT --> REPO
+    ISSUERS -.->|companion| CM
+    MON -.->|companion| KPS
+    GSEC -.->|companion| GITEA
 ```
+
+A chart only takes values, so the extra resources an app needs (issuers, dashboards, rules, `SopsSecret`s) live in a companion app that points to `manifests/<name>/`.
 
 - `root` points to the `apps/` folder of this repo.
 - Each file in `apps/` is itself an ArgoCD `Application`.
@@ -168,7 +193,25 @@ flowchart LR
 - **At most one pod:** `ReadWriteOnce` limits mounts to one **node**, not one pod, so it does not stop two pods on the same node from opening the database. A Deployment's ReplicaSet starts a replacement as soon as a pod is deleted, while the old one is still terminating. A StatefulSet only recreates `vaultwarden-0` once the old pod is gone. The cost is availability: if the node dies, the pod is not replaced until Kubernetes confirms the old one no longer exists. `ReadWriteOncePod` would enforce this at the volume level, but needs a CSI driver.
 - **Not in Git:** the data itself, and `/data/config.json` if settings are saved in the admin panel (it overrides the env vars declared in Git, and `selfHeal` cannot see it).
 
-## 10. Repository layout and ownership
+Gitea follows the same model (SQLite, repositories and queues on one local-path volume), with two differences: the Helm chart creates the PVC (protected from pruning with `Delete=false`) and runs a Deployment with `strategy: Recreate` instead of a StatefulSet. See the trade-offs in [section 12](#12-design-decisions-and-trade-offs).
+
+## 10. Observability
+
+```mermaid
+flowchart LR
+    T[Traefik<br/>metrics per service] -->|ServiceMonitor| P[Prometheus]
+    K[node-exporter,<br/>kube-state-metrics, kubelet] --> P
+    R[PrometheusRules<br/>SLO burn-rate alerts] -->|ruleSelector| P
+    P -->|firing alerts| AM[Alertmanager<br/>no receiver yet]
+    P --> G[Grafana]
+    D[Dashboards<br/>ConfigMaps in monitoring] -->|sidecar| G
+```
+
+- Traefik sees every request at the edge, so request rate, status codes and latency are measured for every app without instrumenting them.
+- Prometheus only picks up `ServiceMonitor`s and `PrometheusRule`s labelled `release: kube-prometheus-stack`. Rules and dashboards live in `manifests/monitoring/`; the rules are unit tested in CI with `promtool` (`tests/prometheus/`).
+- The SLOs are availability (99% non-5xx) and latency (99% of HTTP requests within 300 ms), both over 30 days with multi-window, multi-burn-rate alerts.
+
+## 11. Repository layout and ownership
 
 | Path | Purpose | Applied by |
 |---|---|---|
@@ -177,11 +220,14 @@ flowchart LR
 | `apps/` | ArgoCD Applications, one per service | ArgoCD (via `root`) |
 | `manifests/argocd/` | ArgoCD's own installation (kustomization) | `make up` once, then ArgoCD (`apps/argocd.yaml`) |
 | `manifests/` | Raw manifests and values used by apps | ArgoCD |
+| `tests/prometheus/` | `promtool` unit tests for the `PrometheusRule`s | CI only, never deployed |
+| `scripts/`, `.github/workflows/` | CI: tool install, render + validate + scan, rule tests | GitHub Actions and `make lint/validate/scan/test-rules` |
+| `renovate.json` | Version bump PRs | Renovate |
 | `docs/` | Documentation | n/a |
 
 `kind-config.yaml` is deliberately kept out of `apps/`: it is not a Kubernetes resource and exists before the cluster does.
 
-## 11. Design decisions and trade-offs
+## 12. Design decisions and trade-offs
 
 | Decision | Alternative | Reasoning |
 |---|---|---|
@@ -215,7 +261,7 @@ flowchart LR
 | Alert rules unit tested with `promtool test rules` in CI (`tests/prometheus/`) | Only checking the syntax, breaking an app to see the alert fire | An alert that never fires looks the same as a healthy service, so simulated series assert when each alert fires and clears without touching the cluster. Each alert is "branch A or branch B" and a constantly failing service fires both, so the tests isolate each branch. `group_eval_order` is required: promtool evaluates groups in random order otherwise, which makes values in annotations flaky. |
 | Gitea clone over HTTPS only | SSH through a new host port | kind-specific: SSH would need another `extraPortMappings` entry (cluster rebuild) or a TCP route in Traefik. HTTPS reuses the existing ingress and TLS. |
 
-## 12. Failure modes and recovery
+## 13. Failure modes and recovery
 
 | Scenario | Behaviour | Recovery |
 |---|---|---|
@@ -232,7 +278,20 @@ flowchart LR
 
 State that is **not** stored in Git (application data, persistent volumes) is lost when the cluster is destroyed. Vaultwarden and Gitea only hold test data until backups are in place.
 
-## 13. Security considerations
+## 14. Security considerations
+
+How a secret gets from Git into a pod:
+
+```mermaid
+flowchart LR
+    ME[Me: sops -e -i] -->|encrypted SopsSecret| GIT[(Git<br/>*.sops.yaml)]
+    GIT -->|synced as-is, still encrypted| ARGO[ArgoCD]
+    ARGO --> SS[SopsSecret resource]
+    KEY[Secret sops-age-key<br/>loaded by make up] --> OP[sops-secrets-operator]
+    SS --> OP
+    OP -->|decrypts, creates| SEC[Kubernetes Secret]
+    SEC --> POD[Pod: env vars / existingSecret]
+```
 
 Current state and planned improvements:
 
@@ -243,12 +302,13 @@ Current state and planned improvements:
 - Supply chain: every chart, CLI tool and the ArgoCD manifest are pinned to exact versions, and GitHub Actions to commit digests. CI validates (`kubeconform`) and scans (Trivy) the rendered manifests on every PR.
 - Renovate proposes version bumps as pull requests, so every update goes through the same CI checks before it reaches `main`. New releases must be at least 3 days old (`minimumReleaseAge`), which leaves time for a compromised release to be detected and pulled before it is proposed.
 
-## 14. Planned evolution
+## 15. Planned evolution
 
-1. Pin all versions and add Renovate.
-2. Add CI validation (`yamllint`, `kubeconform`, Trivy).
-3. Add cert-manager and TLS.
-4. Add kube-prometheus-stack for metrics, dashboards and alerting.
-5. Add SOPS + age for secrets.
+1. Pin all versions and add Renovate (done).
+2. Add CI validation: `yamllint`, `kubeconform`, Trivy, `promtool` rule tests (done).
+3. Add cert-manager and TLS (done).
+4. Add kube-prometheus-stack for metrics, dashboards and alerting (done).
+5. Add SOPS + age for secrets (done).
 6. Deploy real applications: Vaultwarden and Gitea (done); backups for stateful apps (postponed).
-7. Phase 2: move to a multi-VM k3s cluster provisioned with Terraform (libvirt) and configured with Ansible, keeping the same GitOps repo.
+7. Dashboards, alerts and SLOs from Traefik metrics (done).
+8. Phase 2: move to a multi-VM k3s cluster provisioned with Terraform (libvirt) and configured with Ansible, keeping the same GitOps repo.
