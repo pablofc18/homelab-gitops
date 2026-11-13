@@ -10,19 +10,23 @@ Built on my own machine (Omarchy / Arch Linux) as a hands-on project to learn an
  
 ```mermaid
 flowchart LR
-    Dev[Me] -->|git push| GH[(GitHub repo<br/>homelab-gitops)]
- 
+    Dev[Me] -->|pull request| GH[(GitHub repo<br/>homelab-gitops)]
+    REN[Renovate] -->|version bump PRs| GH
+    CI[GitHub Actions<br/>yamllint, kubeconform,<br/>Trivy, promtool] -->|required checks| GH
+
     subgraph PC[Local machine - Docker]
         subgraph KIND[kind cluster: 1 control-plane + 2 workers]
-            ARGO[ArgoCD]
-            ROOT[root app<br/>app-of-apps]
-            TRAEFIK[Traefik<br/>ingress controller]
-            ARGO --> ROOT --> TRAEFIK
+            ARGO[ArgoCD<br/>manages itself] --> ROOT[root app<br/>app-of-apps]
+            ROOT --> TRAEFIK[Traefik<br/>ingress controller]
+            ROOT --> PLATFORM[Platform<br/>cert-manager, sops-secrets-operator,<br/>kube-prometheus-stack + Grafana]
+            ROOT --> APPS[Apps<br/>whoami, Vaultwarden, Gitea]
+            TRAEFIK -->|HTTPS| PLATFORM
+            TRAEFIK -->|HTTPS| APPS
         end
     end
- 
-    GH -->|ArgoCD pulls and syncs| ARGO
-    Browser[Browser / curl] -->|localhost:80/443| TRAEFIK
+
+    GH -->|ArgoCD pulls main and syncs| ARGO
+    Browser[Browser / curl] -->|"https://*.localhost"| TRAEFIK
 ```
  
 **How it works**
@@ -42,6 +46,12 @@ flowchart LR
 | [ArgoCD](https://argo-cd.readthedocs.io/) | GitOps controller that syncs the cluster with this repo |
 | [Traefik](https://traefik.io/) | Ingress controller (HTTP/HTTPS entrypoint to the cluster) |
 | [Helm](https://helm.sh/) | Packaging of third-party applications (charts) |
+| [cert-manager](https://cert-manager.io/) | TLS certificates for every Ingress, signed by a local CA |
+| [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age) | Secrets encrypted in Git, decrypted in the cluster by [sops-secrets-operator](https://github.com/isindir/sops-secrets-operator) |
+| [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) | Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics |
+| [Vaultwarden](https://github.com/dani-garcia/vaultwarden), [Gitea](https://about.gitea.com/) | First real (stateful) applications |
+| GitHub Actions | CI: `yamllint`, `kubeconform`, Trivy and `promtool` on every PR |
+| [Renovate](https://docs.renovatebot.com/) | Automated version bump PRs for charts, images, actions and tools |
 | Make | Single-command bootstrap and teardown |
  
 ## Repository structure
@@ -64,11 +74,21 @@ homelab-gitops/
 │   ├── vaultwarden.yaml
 │   └── whoami.yaml
 ├── manifests/               # Custom manifests / values referenced by apps
+│   ├── argocd/              # Kustomization over the pinned upstream ArgoCD install.yaml
+│   ├── cert-manager-issuers/
+│   ├── gitea-secrets/
+│   ├── monitoring/          # Grafana admin secret, dashboards, SLO rules
+│   ├── vaultwarden/
+│   └── whoami/
 ├── tests/prometheus/        # Unit tests for the Prometheus rules (promtool)
+├── scripts/                 # CI helpers: tool install, manifest validation, rule tests
+├── .github/workflows/       # CI (lint.yaml)
 ├── docs/                    # Extra documentation
 ├── Makefile
 ├── renovate.json            # Automated dependency update PRs
 ├── .sops.yaml               # Which files SOPS encrypts, and with which age public key
+├── .trivyignore.yaml        # Accepted Trivy findings, each with a justification
+├── .yamllint                # yamllint rules
 └── README.md
 ```
  
@@ -138,6 +158,16 @@ make argocd-ui         # port-forward, keep it running
 ```
  
 Open <https://localhost:8080> (self-signed certificate warning is expected) and log in as `admin`.
+
+### Grafana
+
+Dashboards and alerts at <https://grafana.localhost> (trust the lab CA, see above). The admin credentials come from `manifests/monitoring/grafana-admin.sops.yaml`; read the password locally:
+
+```bash
+sops -d --extract '["spec"]["secretTemplates"][0]["stringData"]["admin-password"]' manifests/monitoring/grafana-admin.sops.yaml
+```
+
+The *Services (Traefik)* dashboard shows request rate, errors and latency per app, and the SLO burn-rate alerts are under *Alerting* → *Alert rules*. Dashboards are provisioned from Git, so edit their JSON in `manifests/monitoring/` instead of saving them in the UI.
 
 ### Vaultwarden
 
@@ -235,8 +265,9 @@ The cluster is disposable by design: everything can be rebuilt from this repo wi
 - [x] HTTP always redirected to HTTPS at the Traefik entrypoint
 - [x] Vaultwarden at `https://vaultwarden.localhost`: StatefulSet + PVC, admin token from SOPS
 - [x] Gitea at `https://gitea.localhost`: Helm chart with SQLite, admin credentials from SOPS
-- [ ] Backups for stateful apps (postponed)
 - [x] Observability: Traefik metrics, Grafana dashboard, availability and latency SLOs with burn-rate alerts
+- [ ] Backups for stateful apps (postponed)
+- [ ] Phase 2: multi-VM k3s cluster with Terraform (libvirt) + Ansible, reusing this GitOps repo
 
 ## What I'm learning
 
